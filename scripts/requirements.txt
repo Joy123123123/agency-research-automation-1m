@@ -12,4 +12,4 @@ smtplib2==0.2.1
 email-validator==2.1.0.post1
 selenium==4.18.1
 playwright==1.42.0
-aiohttp==3.9.3
+aiohttp==3.13.3
