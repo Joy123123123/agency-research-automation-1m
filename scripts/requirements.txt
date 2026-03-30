@@ -1,0 +1,35 @@
+# Agency Research Automation — Python Dependencies
+# Owner: Md Jamil Islam
+#
+# Install with: pip install -r requirements.txt
+
+# HTTP requests and web scraping
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Data processing
+pandas>=2.0.0
+openpyxl>=3.1.0  # Excel support for pandas
+
+# Email validation
+email-validator>=2.0.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# CLI progress bars
+tqdm>=4.65.0
+
+# Rate limiting for API calls
+ratelimit>=2.2.1
+
+# Date/time utilities
+python-dateutil>=2.8.2
+
+# CSV and data cleaning
+csvkit>=1.1.1
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
