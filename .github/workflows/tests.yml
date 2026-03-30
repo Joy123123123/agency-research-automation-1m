@@ -43,11 +43,11 @@ jobs:
           pip install --upgrade pip
           pip install pytest pytest-asyncio pytest-cov
           # Install only test-compatible packages (no browser/heavy deps)
-          pip install requests beautifulsoup4 schedule jinja2 python-dotenv pydantic || true
+          pip install requests beautifulsoup4 schedule jinja2 python-dotenv pydantic
 
       - name: Run tests
         run: |
-          pytest tests/ -v --tb=short --ignore=tests/test_integration.py 2>&1 || true
+          pytest tests/ -v --tb=short --ignore=tests/test_integration.py 2>&1
           echo "✅ Tests complete"
 
       - name: Test summary
