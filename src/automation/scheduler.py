@@ -65,7 +65,7 @@ class AgencyScheduler:
 
         while self.running:
             schedule.run_pending()
-            time.sleep(60)
+            time.sleep(10)
 
     def stop(self):
         """Stop the scheduler."""

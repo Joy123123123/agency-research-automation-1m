@@ -93,7 +93,7 @@ def main():
             to_email=email,
             to_name=name,
             subject=content.get("subject", f"Quick question about {name}"),
-            html_content=f"<p>{content.get('body', '').replace(chr(10), '<br>')}</p>"
+            html_content=f"<p>{content.get('body', '').replace('\n', '<br>')}</p>"
         )
 
         if result.status == "sent":

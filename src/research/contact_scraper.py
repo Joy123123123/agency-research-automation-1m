@@ -31,11 +31,10 @@ class ContactScraper:
         self.delay = delay
         self.timeout = timeout
         self.session = requests.Session()
+        from config.settings import USER_AGENTS
+        import random
         self.session.headers.update({
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
-            )
+            "User-Agent": random.choice(USER_AGENTS)
         })
 
     def scrape_website(self, url: str) -> Dict:
@@ -74,19 +73,24 @@ class ContactScraper:
             phones = list(set(self.PHONE_PATTERN.findall(text)))
             contact_info["phones"] = [p[0] or p[1] for p in phones if p[0] or p[1]]
 
-            # Extract social media links
+            # Extract social media links — use parsed netloc to prevent substring spoofing
+            from urllib.parse import urlparse as _urlparse
             for link in soup.find_all("a", href=True):
-                href = link["href"].lower()
-                if "facebook.com" in href and not contact_info["facebook"]:
-                    contact_info["facebook"] = link["href"]
-                elif "instagram.com" in href and not contact_info["instagram"]:
-                    contact_info["instagram"] = link["href"]
-                elif "twitter.com" in href and not contact_info["twitter"]:
-                    contact_info["twitter"] = link["href"]
-                elif "linkedin.com" in href and not contact_info["linkedin"]:
-                    contact_info["linkedin"] = link["href"]
-                elif "wa.me" in href or "whatsapp.com" in href:
-                    contact_info["whatsapp"] = link["href"]
+                href = link["href"]
+                try:
+                    netloc = _urlparse(href).netloc.lower().lstrip("www.")
+                except Exception:
+                    continue
+                if netloc in ("facebook.com", "fb.com") and not contact_info["facebook"]:
+                    contact_info["facebook"] = href
+                elif netloc == "instagram.com" and not contact_info["instagram"]:
+                    contact_info["instagram"] = href
+                elif netloc in ("twitter.com", "x.com") and not contact_info["twitter"]:
+                    contact_info["twitter"] = href
+                elif netloc == "linkedin.com" and not contact_info["linkedin"]:
+                    contact_info["linkedin"] = href
+                elif netloc in ("wa.me", "whatsapp.com") and not contact_info["whatsapp"]:
+                    contact_info["whatsapp"] = href
 
             # Also check contact page
             contact_page = self._find_contact_page(soup, url)
