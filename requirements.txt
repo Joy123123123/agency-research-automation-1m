@@ -1,6 +1,9 @@
 # Agency Research Automation — Python Dependencies
 # Install: pip install -r requirements.txt
 
+# Web App (Mobile Dashboard)
+flask>=3.0.0
+
 # Core HTTP & Async
 aiohttp>=3.9.5
 requests>=2.31.0
