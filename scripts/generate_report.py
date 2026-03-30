@@ -26,13 +26,17 @@ def main():
     args = parser.parse_args()
 
     generator = ReportGenerator()
-    summary = generator.generate_weekly_summary()
+    if args.period == "weekly":
+        summary = generator.generate_weekly_summary()
+    else:
+        summary = generator.generate_monthly_summary()
 
     if args.format == "html":
         output = generator.generate_html_report(summary)
         print(f"\n✅ HTML report saved: {output}")
     elif args.format == "csv":
-        output = generator.export_to_csv([], filename=f"summary_{args.period}.csv")
+        # Export summary metrics as a single-row CSV instead of an empty leads list
+        output = generator.export_to_csv([summary], filename=f"summary_{args.period}.csv")
         print(f"\n✅ CSV exported: {output}")
     elif args.format == "json":
         import json
