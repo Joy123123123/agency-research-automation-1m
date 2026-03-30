@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - main
+      - "copilot/check-repo-status"
 
 jobs:
   create-branches:
@@ -25,6 +26,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.sha }}
 
       - name: Configure Git
         run: |
@@ -37,16 +39,24 @@ jobs:
             echo "✅ Branch 'develop' already exists"
           else
             git checkout -b develop
-            echo "# DEVELOP Branch" > DEVELOP.md
-            echo "" >> DEVELOP.md
-            echo "এই ব্রাঞ্চ হলো **ডেভেলপমেন্ট ইন্টিগ্রেশন ব্রাঞ্চ**।" >> DEVELOP.md
-            echo "" >> DEVELOP.md
-            echo "সব \`feature/*\` ব্রাঞ্চ এখানে merge হবে।" >> DEVELOP.md
-            echo "Workflow: \`feature/* → develop → staging → main\`" >> DEVELOP.md
+            cat > DEVELOP.md << 'MDEOF'
+# DEVELOP Branch — Agency Research Automation
+
+এই ব্রাঞ্চ হলো **ডেভেলপমেন্ট ইন্টিগ্রেশন ব্রাঞ্চ**।
+
+সব `feature/*` ব্রাঞ্চ এখানে merge হবে।
+
+**Workflow:** `feature/* → develop → staging → main`
+
+## Rules
+- Never push directly to `main`
+- All PRs must target `develop` first
+- Tests must pass before merging to `staging`
+MDEOF
             git add DEVELOP.md
             git commit -m "chore: initialize develop branch"
             git push origin develop
-            git checkout main || git checkout -
+            git checkout -
             echo "✅ Created 'develop' branch"
           fi
 
@@ -55,17 +65,24 @@ jobs:
           if git ls-remote --exit-code --heads origin staging; then
             echo "✅ Branch 'staging' already exists"
           else
-            git checkout main || git checkout -f $(git rev-parse HEAD)
+            git checkout ${{ github.sha }}
             git checkout -b staging
-            echo "# STAGING Branch" > STAGING.md
-            echo "" >> STAGING.md
-            echo "এই ব্রাঞ্চ হলো **প্রি-প্রোডাকশন টেস্টিং ব্রাঞ্চ**।" >> STAGING.md
-            echo "" >> STAGING.md
-            echo "\`develop\` থেকে merge আসে। Production-এ যাওয়ার আগে এখানে সব কিছু টেস্ট হয়।" >> STAGING.md
+            cat > STAGING.md << 'MDEOF'
+# STAGING Branch — Agency Research Automation
+
+এই ব্রাঞ্চ হলো **প্রি-প্রোডাকশন টেস্টিং ব্রাঞ্চ**।
+
+`develop` থেকে merge আসে। Production-এ যাওয়ার আগে এখানে সব কিছু টেস্ট হয়।
+
+## Rules
+- QA/UAT testing happens here
+- Must pass all integration tests before merging to `main`
+- No direct commits — only merges from `develop`
+MDEOF
             git add STAGING.md
             git commit -m "chore: initialize staging branch"
             git push origin staging
-            git checkout main || git checkout -f $(git rev-parse HEAD)
+            git checkout -
             echo "✅ Created 'staging' branch"
           fi
 
@@ -74,18 +91,33 @@ jobs:
           if git ls-remote --exit-code --heads origin hotfix; then
             echo "✅ Branch 'hotfix' already exists"
           else
-            git checkout main || git checkout -f $(git rev-parse HEAD)
+            git checkout ${{ github.sha }}
             git checkout -b hotfix
-            echo "# HOTFIX Branch" > HOTFIX.md
-            echo "" >> HOTFIX.md
-            echo "এই ব্রাঞ্চ হলো **ইমার্জেন্সি প্রোডাকশন ফিক্স ব্রাঞ্চ**।" >> HOTFIX.md
-            echo "" >> HOTFIX.md
-            echo "শুধুমাত্র critical bugs fix করতে এই branch ব্যবহার করুন।" >> HOTFIX.md
-            echo "Fix করার পর \`main\` এবং \`develop\` উভয়তে merge করুন।" >> HOTFIX.md
+            cat > HOTFIX.md << 'MDEOF'
+# HOTFIX Branch — Agency Research Automation
+
+এই ব্রাঞ্চ হলো **ইমার্জেন্সি প্রোডাকশন ফিক্স ব্রাঞ্চ**।
+
+শুধুমাত্র critical production bugs fix করতে এই branch ব্যবহার করুন।
+
+## Usage
+```bash
+git checkout hotfix
+git checkout -b hotfix/fix-description
+# ... make fix ...
+git commit -m "fix: description"
+# Merge into main AND develop
+```
+
+## Rules
+- Only for critical bugs in production
+- After merging to `main`, also merge into `develop`
+- Bump version (e.g., v1.0.1)
+MDEOF
             git add HOTFIX.md
             git commit -m "chore: initialize hotfix branch"
             git push origin hotfix
-            git checkout main || git checkout -f $(git rev-parse HEAD)
+            git checkout -
             echo "✅ Created 'hotfix' branch"
           fi
 
@@ -94,25 +126,50 @@ jobs:
           if git ls-remote --exit-code --heads origin release/v1.0; then
             echo "✅ Branch 'release/v1.0' already exists"
           else
-            git checkout main || git checkout -f $(git rev-parse HEAD)
+            git checkout ${{ github.sha }}
             git checkout -b release/v1.0
-            echo "# Release v1.0.0 — Agency Research Automation" > RELEASE_NOTES.md
-            echo "" >> RELEASE_NOTES.md
-            echo "**Release Date:** $(date +%Y-%m-%d)" >> RELEASE_NOTES.md
-            echo "**Owner:** Md Jamil Islam" >> RELEASE_NOTES.md
-            echo "" >> RELEASE_NOTES.md
-            echo "## What's New in v1.0.0" >> RELEASE_NOTES.md
-            echo "- Agency discovery via Google Maps API" >> RELEASE_NOTES.md
-            echo "- Contact scraping (email, phone, social)" >> RELEASE_NOTES.md
-            echo "- AI-powered email generation (OpenAI + Gemini)" >> RELEASE_NOTES.md
-            echo "- Automated outreach via SendGrid" >> RELEASE_NOTES.md
-            echo "- Follow-up automation (4-step sequence)" >> RELEASE_NOTES.md
-            echo "- Weekly/monthly reports (HTML + CSV)" >> RELEASE_NOTES.md
-            echo "- Daily task scheduler" >> RELEASE_NOTES.md
+            cat > RELEASE_NOTES.md << 'MDEOF'
+# Release v1.0.0 — Agency Research Automation
+**Release Date:** 2026-04-01
+**Owner:** Md Jamil Islam
+
+## 🎉 What's New in v1.0.0
+
+### Core Features
+- ✅ Agency discovery via Google Maps API
+- ✅ Contact scraping (email, phone, social media)
+- ✅ Market analysis & opportunity scoring
+- ✅ AI-powered email content generation (OpenAI + Gemini)
+- ✅ Automated outreach via SendGrid
+- ✅ 4-step automated follow-up sequence
+- ✅ Weekly/monthly HTML & CSV reports
+- ✅ Daily task scheduler
+
+### Supported Niches
+Restaurant, Dentist, Lawyer, Real Estate, Gym, Salon, Hotel, Pharmacy
+
+### Tech Stack
+Python 3.10+, SendGrid, OpenAI/Gemini, Airtable, Google Maps API
+
+## Installation
+```bash
+git clone https://github.com/Joy123123123/agency-research-automation-1m.git
+cd agency-research-automation-1m
+bash scripts/setup.sh
+```
+
+## Known Issues
+None in v1.0.0
+
+## Upcoming (v1.1.0)
+- LinkedIn outreach automation
+- WhatsApp Business API
+- Real-time Streamlit dashboard
+MDEOF
             git add RELEASE_NOTES.md
-            git commit -m "chore: initialize release/v1.0 branch"
+            git commit -m "chore: initialize release/v1.0 branch with release notes"
             git push origin release/v1.0
-            git checkout main || git checkout -f $(git rev-parse HEAD)
+            git checkout -
             echo "✅ Created 'release/v1.0' branch"
           fi
 
@@ -121,13 +178,14 @@ jobs:
           echo ""
           echo "🎉 Branch Setup Complete!"
           echo ""
-          echo "Branches in repository:"
+          echo "Branches now in repository:"
           git --no-pager branch -a
           echo ""
-          echo "Branch Strategy:"
+          echo "📊 Branch Strategy:"
           echo "  main          ← Production (stable)"
           echo "  develop       ← Integration (all features merge here)"
           echo "  staging       ← Pre-production testing"
-          echo "  release/v1.0  ← Current release"
-          echo "  hotfix        ← Emergency fixes"
-          echo "  feature/*     ← New features"
+          echo "  release/v1.0  ← Current release preparation"
+          echo "  hotfix        ← Emergency production fixes"
+          echo "  feature/*     ← New feature development"
+
