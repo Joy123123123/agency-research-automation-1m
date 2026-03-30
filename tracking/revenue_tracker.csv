@@ -1,0 +1,2 @@
+client_name,package,mrr,date_started,billing_date,amount_collected,status,payment_method,notes
+Example Client,Growth,$1250,2024-01-01,1st of month,$1250,active,Stripe,Sample entry - replace with real data
