@@ -1,0 +1,67 @@
+name: 🌿 Create All Standard Branches
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - "copilot/check-repo-status"
+
+jobs:
+  create-branches:
+    name: Create Standard Git Branches via API
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Create branches using GitHub API
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = context.sha;
+
+            const branches = [
+              'develop',
+              'staging',
+              'hotfix',
+              'release/v1.0',
+            ];
+
+            console.log(`Base SHA: ${sha}`);
+            console.log(`Creating branches from: ${context.ref}`);
+
+            for (const branch of branches) {
+              try {
+                // Check if branch exists
+                await github.rest.git.getRef({
+                  owner, repo,
+                  ref: `heads/${branch}`
+                });
+                console.log(`✅ Branch '${branch}' already exists — skipping`);
+              } catch (e) {
+                if (e.status === 404) {
+                  // Create the branch
+                  await github.rest.git.createRef({
+                    owner, repo,
+                    ref: `refs/heads/${branch}`,
+                    sha: sha
+                  });
+                  console.log(`🎉 Created branch: ${branch}`);
+                } else {
+                  console.error(`❌ Error checking branch '${branch}': ${e.message}`);
+                }
+              }
+            }
+
+            // List all branches
+            const { data: allBranches } = await github.rest.repos.listBranches({
+              owner, repo, per_page: 50
+            });
+            console.log('\n📋 All branches in repository:');
+            allBranches.forEach(b => console.log(`  - ${b.name}`));
+
+
