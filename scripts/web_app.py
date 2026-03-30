@@ -16,6 +16,7 @@ Features:
     - 📧 Outreach Tool — dry-run + live send, auto-runs send_outreach.py
     - 👥 Lead Manager — view/filter all leads from CSV
     - 📊 Report Generator — weekly/monthly, auto-runs generate_report.py
+    - 🤖 AI Assistant — API-free, Bengali-first intelligent guide
     - ⚡ Real-time terminal output (Server-Sent Events)
     - 💾 Progress tracking with resume (tracking/app_progress.json)
     - 🔔 Reminder: pending daily tasks shown on dashboard
@@ -38,10 +39,25 @@ from typing import Any, Generator
 
 # ── Bootstrap Flask (friendly error if missing) ──────────────────────────────
 try:
-    from flask import Flask, Response, jsonify, redirect, render_template_string, request, url_for
+    from flask import (
+        Flask, Response, jsonify, redirect,
+        render_template_string, request, session, url_for,
+    )
 except ImportError:
     print("\n❌  Flask পাওয়া যায়নি। ইনস্টল করুন:\n    pip install flask\n")
     sys.exit(1)
+
+# ── AI Assistant (local, no external API) ────────────────────────────────────
+# Dynamically import so the app still works even if the file is missing
+try:
+    _scripts_dir = Path(__file__).parent
+    if str(_scripts_dir) not in sys.path:
+        sys.path.insert(0, str(_scripts_dir))
+    from ai_assistant import AgencyAI  # type: ignore[import]
+    _AI_AVAILABLE = True
+except ImportError:
+    _AI_AVAILABLE = False
+    AgencyAI = None  # type: ignore[assignment,misc]
 
 # ── Allowed values (input validation) ────────────────────────────────────────
 ALLOWED_NICHES = {
@@ -80,11 +96,30 @@ logger = logging.getLogger(__name__)
 
 # ── Flask app ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 
 # ── Global job output queue ───────────────────────────────────────────────────
 _job_output: queue.Queue[str] = queue.Queue()
 _job_running = threading.Event()
+
+# ── Per-session AI instances (keyed by session ID) ───────────────────────────
+_ai_instances: dict[str, "AgencyAI"] = {}
+_ai_lock = threading.Lock()
+
+
+def get_ai() -> "AgencyAI | None":
+    """Return or create an AgencyAI instance for the current session."""
+    if not _AI_AVAILABLE or AgencyAI is None:
+        return None
+    sid = session.get("_id")
+    if not sid:
+        import secrets
+        sid = secrets.token_hex(16)
+        session["_id"] = sid
+    with _ai_lock:
+        if sid not in _ai_instances:
+            _ai_instances[sid] = AgencyAI(BASE_DIR)
+        return _ai_instances[sid]
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -727,6 +762,51 @@ a:hover{color:#7ab3ff;}
 .warn-box{background:rgba(243,156,18,.1);border-radius:8px;padding:10px 13px;
   margin-bottom:14px;font-size:.8rem;color:var(--warn);}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+/* ── AI Chat styles ────────────────────────────────────────────────────── */
+.chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 180px);min-height:300px;}
+.chat-msgs{flex:1;overflow-y:auto;padding:10px 0;display:flex;flex-direction:column;gap:10px;}
+.msg{max-width:88%;padding:11px 14px;border-radius:14px;font-size:.85rem;line-height:1.65;
+  word-break:break-word;}
+.msg-ai{background:#0d1f35;border:1px solid var(--border);align-self:flex-start;
+  border-bottom-left-radius:4px;color:var(--text);}
+.msg-user{background:var(--accent);color:#fff;align-self:flex-end;
+  border-bottom-right-radius:4px;}
+.msg-ai h1,.msg-ai h2,.msg-ai h3{font-size:.95rem;color:var(--accent);
+  margin-top:10px;margin-bottom:5px;font-weight:700;}
+.msg-ai h1:first-child,.msg-ai h2:first-child{margin-top:0;}
+.msg-ai ul,.msg-ai ol{padding-left:18px;margin:5px 0;}
+.msg-ai li{margin-bottom:3px;}
+.msg-ai code{background:#05111f;padding:1px 5px;border-radius:4px;
+  font-family:monospace;font-size:.82rem;color:#7ecb7e;}
+.msg-ai pre{background:#05111f;padding:10px;border-radius:7px;
+  overflow-x:auto;font-size:.78rem;color:#7ecb7e;margin:7px 0;}
+.msg-ai pre code{background:none;padding:0;}
+.msg-ai table{font-size:.78rem;margin:7px 0;}
+.msg-ai strong{color:#c8d8f0;}
+.msg-ai em{color:var(--muted);}
+.msg-ai hr{border-color:var(--border);margin:8px 0;}
+.msg-ai blockquote{border-left:3px solid var(--accent);padding-left:10px;
+  color:var(--muted);margin:5px 0;}
+.quick-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.quick-btn{background:#0d1525;border:1px solid var(--border);color:var(--text);
+  border-radius:20px;padding:5px 12px;font-size:.75rem;cursor:pointer;
+  transition:all .15s;white-space:nowrap;}
+.quick-btn:hover,.quick-btn:active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.quick-btn.goto{background:rgba(79,142,247,.15);border-color:var(--accent);color:var(--accent);}
+.chat-input-row{display:flex;gap:8px;padding:10px 0 5px;}
+.chat-input{flex:1;background:#0d1525;border:1px solid var(--border);color:var(--text);
+  border-radius:24px;padding:10px 16px;font-size:.9rem;outline:none;resize:none;
+  font-family:inherit;max-height:110px;overflow-y:auto;}
+.chat-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.15);}
+.send-btn{background:var(--accent);border:none;color:#fff;width:44px;height:44px;
+  border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;flex-shrink:0;transition:all .2s;}
+.send-btn:hover{background:#3a7de5;}
+.typing-dot{display:inline-block;width:6px;height:6px;background:var(--muted);
+  border-radius:50%;animation:blink 1.2s infinite;margin:0 2px;}
+.typing-dot:nth-child(2){animation-delay:.2s;}
+.typing-dot:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.2;}40%{opacity:1;}}
 @media(max-width:380px){.stat-num{font-size:1.35rem;}body{font-size:14px;}}
 </style>
 """
@@ -734,6 +814,7 @@ a:hover{color:#7ab3ff;}
 COMMON_SCRIPTS = """
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+/* ── SSE stream runner ─────────────────────────────────────────────────── */
 function runStream(url, termId, onDone) {
   var term = document.getElementById(termId);
   if (!term) return;
@@ -754,6 +835,62 @@ function toggleSection(id) {
   var el = document.getElementById(id);
   el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
 }
+
+/* ── Lightweight Markdown → HTML renderer (no external lib needed) ──── */
+function mdToHtml(md) {
+  if (!md) return '';
+  var s = md;
+  // Fenced code blocks
+  s = s.replace(/```([\\s\\S]*?)```/g, function(_, c) {
+    return '<pre><code>' + escHtml(c.trim()) + '</code></pre>';
+  });
+  // Inline code
+  s = s.replace(/`([^`]+)`/g, function(_, c) { return '<code>' + escHtml(c) + '</code>'; });
+  // Headers (## and ###)
+  s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  s = s.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  s = s.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // Bold and italic
+  s = s.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+  s = s.replace(/\\_(.+?)\\_/g, '<em>$1</em>');
+  s = s.replace(/\\*([^*]+)\\*/g, '<em>$1</em>');
+  // HR
+  s = s.replace(/^---$/gm, '<hr>');
+  // Tables (simple)
+  s = s.replace(/\\|(.+)\\|/g, function(line) {
+    var cells = line.split('|').slice(1,-1).map(function(c){ return c.trim(); });
+    return '<tr>' + cells.map(function(c){
+      return /^[-:]+$/.test(c) ? '' : '<td>' + c + '</td>';
+    }).join('') + '</tr>';
+  });
+  s = s.replace(/(<tr>.*<\\/tr>\\n?)+/g, function(t) {
+    return '<table>' + t + '</table>';
+  });
+  // Unordered lists
+  s = s.replace(/(^[\\-\\*] .+\\n?)+/gm, function(block) {
+    var items = block.trim().split('\\n').map(function(ln) {
+      return '<li>' + ln.replace(/^[\\-\\*] /, '') + '</li>';
+    }).join('');
+    return '<ul>' + items + '</ul>';
+  });
+  // Ordered lists
+  s = s.replace(/(^\\d+\\. .+\\n?)+/gm, function(block) {
+    var items = block.trim().split('\\n').map(function(ln) {
+      return '<li>' + ln.replace(/^\\d+\\. /, '') + '</li>';
+    }).join('');
+    return '<ol>' + items + '</ol>';
+  });
+  // Blockquote
+  s = s.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+  // Paragraphs (double newline)
+  s = s.replace(/\\n\\n+/g, '</p><p>');
+  // Single newlines (inside paragraph)
+  s = s.replace(/\\n/g, '<br>');
+  return '<p>' + s + '</p>';
+}
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 </script>
 """
 
@@ -763,7 +900,7 @@ def nav_html(active: str) -> str:
     pages = [
         ("home", "/", "fa-home", "হোম"),
         ("research", "/research", "fa-search", "রিসার্চ"),
-        ("outreach", "/outreach", "fa-envelope", "আউটরিচ"),
+        ("ai", "/ai", "fa-robot", "AI"),
         ("leads", "/leads", "fa-users", "লিডস"),
         ("reports", "/reports", "fa-chart-bar", "রিপোর্ট"),
     ]
@@ -1575,6 +1712,246 @@ def api_run_task_script(task_id: str) -> Response:
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# AI Assistant routes
+# ═════════════════════════════════════════════════════════════════════════════
+
+@app.route("/ai")
+def ai_page() -> str:
+    """AI Assistant chat page."""
+    ai = get_ai()
+    briefing: dict[str, Any] = {}
+    if ai:
+        briefing = ai.daily_briefing()
+
+    tpl = """
+<div style="padding:13px 13px 4px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+    <div style="width:38px;height:38px;background:linear-gradient(135deg,#4f8ef7,#6f42c1);
+      border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-size:1.15rem;flex-shrink:0;">🤖</div>
+    <div>
+      <div style="font-weight:700;font-size:.92rem;">Agency AI Assistant</div>
+      <div style="font-size:.68rem;color:var(--muted);">
+        API-free &bull; Bengali &bull; Context-aware
+        <span style="color:var(--success);margin-left:5px;">● Online</span>
+      </div>
+    </div>
+    <button onclick="clearChat()"
+      style="margin-left:auto;background:none;border:none;color:var(--muted);
+        font-size:.72rem;cursor:pointer;padding:4px 8px;border:1px solid var(--border);
+        border-radius:6px;">🗑 Clear</button>
+  </div>
+</div>
+
+<div style="padding:0 13px 13px;">
+  <div class="chat-wrap">
+    <div class="chat-msgs" id="chat-msgs">
+      <!-- Initial briefing message -->
+      <div class="msg msg-ai" id="briefing-msg">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+    </div>
+
+    <!-- Quick action buttons -->
+    <div class="quick-btns" id="quick-btns">
+      <button class="quick-btn" onclick="sendQuick('আজ কী করব?')">📋 আজকের কাজ</button>
+      <button class="quick-btn" onclick="sendQuick('আমার progress কেমন?')">📊 Progress</button>
+      <button class="quick-btn" onclick="sendQuick('কিভাবে রিসার্চ করব?')">🔍 Research</button>
+      <button class="quick-btn" onclick="sendQuick('কিভাবে email পাঠাব?')">📧 Email</button>
+      <button class="quick-btn" onclick="sendQuick('$1M revenue কিভাবে?')">💰 Revenue</button>
+      <button class="quick-btn" onclick="sendQuick('help')">🆘 Help</button>
+    </div>
+
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="chat-input"
+        placeholder="যেকোনো প্রশ্ন করো... (Bengali বা English)"
+        rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}
+                   this.style.height='auto';this.style.height=this.scrollHeight+'px';"
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';">
+      </textarea>
+      <button class="send-btn" onclick="sendMsg()">
+        <i class="fas fa-paper-plane"></i>
+      </button>
+    </div>
+  </div>
+</div>
+"""
+    extra = f"""<script>
+var BRIEFING = {json.dumps(briefing)};
+var chatMsgs = document.getElementById('chat-msgs');
+
+/* Show briefing after short delay (feels natural) */
+setTimeout(function() {{
+  var bEl = document.getElementById('briefing-msg');
+  if (bEl && BRIEFING.reply) {{
+    bEl.innerHTML = mdToHtml(BRIEFING.reply);
+    if (BRIEFING.quick_actions && BRIEFING.quick_actions.length) {{
+      var div = document.createElement('div');
+      div.className = 'quick-btns';
+      div.style.marginTop = '8px';
+      BRIEFING.quick_actions.forEach(function(qa) {{
+        var b = document.createElement('button');
+        b.className = 'quick-btn';
+        b.textContent = qa.label;
+        b.onclick = function() {{ sendQuick(qa.msg); }};
+        div.appendChild(b);
+      }});
+      bEl.appendChild(div);
+    }}
+  }}
+  scrollChat();
+}}, 500);
+
+function scrollChat() {{
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
+}}
+
+function appendMsg(html, isUser) {{
+  var el = document.createElement('div');
+  el.className = 'msg ' + (isUser ? 'msg-user' : 'msg-ai');
+  el.innerHTML = html;
+  chatMsgs.appendChild(el);
+  scrollChat();
+  return el;
+}}
+
+function appendTyping() {{
+  return appendMsg(
+    '<span class="typing-dot"></span><span class="typing-dot"></span>' +
+    '<span class="typing-dot"></span>', false
+  );
+}}
+
+function sendMsg() {{
+  var inp = document.getElementById('chat-input');
+  var msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = '';
+  inp.style.height = 'auto';
+  _doSend(msg);
+}}
+
+function sendQuick(msg) {{
+  if (msg.startsWith('__goto__')) {{
+    window.location.href = msg.replace('__goto__', '');
+    return;
+  }}
+  _doSend(msg);
+}}
+
+function _doSend(msg) {{
+  appendMsg(escHtml(msg), true);
+  var typing = appendTyping();
+  fetch('/api/ai/chat', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{message: msg}})
+  }})
+  .then(function(r) {{ return r.json(); }})
+  .then(function(data) {{
+    typing.remove();
+    var el = appendMsg(mdToHtml(data.reply || '(no response)'), false);
+    // Tool link button
+    if (data.tool_link) {{
+      var div = document.createElement('div');
+      div.style.marginTop = '8px';
+      var a = document.createElement('a');
+      a.href = data.tool_link;
+      a.className = 'quick-btn goto';
+      a.innerHTML = '<i class="fas fa-arrow-right"></i> Tool খোলো';
+      div.appendChild(a);
+      el.appendChild(div);
+    }}
+    // Quick action buttons
+    if (data.quick_actions && data.quick_actions.length) {{
+      var div2 = document.createElement('div');
+      div2.className = 'quick-btns';
+      div2.style.marginTop = '8px';
+      data.quick_actions.forEach(function(qa) {{
+        var b = document.createElement('button');
+        b.className = qa.msg.startsWith('__goto__') ? 'quick-btn goto' : 'quick-btn';
+        b.textContent = qa.label;
+        b.onclick = function() {{ sendQuick(qa.msg); }};
+        div2.appendChild(b);
+      }});
+      el.appendChild(div2);
+    }}
+    scrollChat();
+  }})
+  .catch(function(e) {{
+    typing.remove();
+    appendMsg('❌ Error: ' + e.message, false);
+  }});
+}}
+
+function clearChat() {{
+  fetch('/api/ai/clear', {{method:'POST'}}).then(function() {{
+    chatMsgs.innerHTML = '';
+    location.reload();
+  }});
+}}
+
+function escHtml(t) {{
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}}
+</script>"""
+    return page(f"{tpl}", "ai", extra)
+
+
+@app.route("/api/ai/chat", methods=["POST"])
+def api_ai_chat() -> Response:
+    """Process a chat message through the AI assistant."""
+    from flask import abort
+
+    data = request.get_json(silent=True)
+    if not data or "message" not in data:
+        abort(400)
+
+    raw_message: str = str(data["message"])
+    # Limit input length to prevent abuse
+    message = raw_message[:500].strip()
+    if not message:
+        abort(400)
+
+    ai = get_ai()
+    if ai is None:
+        return jsonify({
+            "reply": (
+                "⚠️ AI Assistant লোড হয়নি।\n\n"
+                "`scripts/ai_assistant.py` ফাইলটি আছে কিনা দেখো।"
+            ),
+            "intent": "error",
+            "quick_actions": [],
+            "tool_link": None,
+            "run_cmd": None,
+        })
+
+    result = ai.chat(message)
+    return jsonify(result)
+
+
+@app.route("/api/ai/clear", methods=["POST"])
+def api_ai_clear() -> Response:
+    """Clear the AI conversation history for this session."""
+    ai = get_ai()
+    if ai:
+        ai.clear_history()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/ai/briefing")
+def api_ai_briefing() -> Response:
+    """Return the daily briefing as JSON."""
+    ai = get_ai()
+    if ai is None:
+        return jsonify({"reply": "AI not available.", "quick_actions": []})
+    return jsonify(ai.daily_briefing())
 
 
 # ═════════════════════════════════════════════════════════════════════════════
