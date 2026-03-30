@@ -4,19 +4,19 @@ Agency AI Assistant — Pure Python, No External API Required
 Owner: Md Jamil Islam
 Goal: $1,000,000 revenue
 
-This module provides a rule-based, context-aware AI assistant that:
-- Guides the user step-by-step through agency automation workflows
-- Understands Bengali and English queries
-- Tracks progress toward the $1M revenue goal
-- Suggests and triggers the right tools at the right time
-- Maintains conversation history in session
+Advanced AI features:
+- MarketIntelligence: US/Europe/Canada niche data with ROI scores
+- NicheAdvisor: recommends best niche+location based on market value & close speed
+- BusinessStrategist: CEO-level thinking — prioritises highest-ROI actions
+- IntentMatcher: 20 intents, Bengali + English
+- ContextLoader: reads live leads.csv + app_progress.json
+- AgencyAI: full chat engine with per-session history
 - Requires ZERO external API calls
 """
 
 from __future__ import annotations
 
 import json
-import re
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -33,6 +33,395 @@ MONTHLY_TARGETS = [
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# Market Intelligence — US/Europe/Canada niche data (built-in, no API)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class MarketIntelligence:
+    """
+    Built-in market data for agency target markets.
+    All data is research-backed averages; no external API needed.
+    """
+
+    # Each entry: (niche, avg_deal_usd, close_speed_days, competition, demand, markets)
+    # close_speed: lower = faster money; competition: 1-5 (5=hardest)
+    NICHES: list[dict[str, Any]] = [
+        {
+            "name": "dentist",
+            "label": "🦷 Dentist",
+            "avg_deal": 2500,
+            "close_days": 7,
+            "competition": 2,
+            "demand": 5,
+            "roi_score": 95,
+            "markets": ["USA", "Canada", "UK", "Australia"],
+            "why": "High value, always needs patients, weak online presence, easy to show ROI",
+            "email_angle": "Show them lost revenue from missing Google reviews/SEO",
+        },
+        {
+            "name": "lawyer",
+            "label": "⚖️ Lawyer / Law Firm",
+            "avg_deal": 3500,
+            "close_days": 10,
+            "competition": 3,
+            "demand": 5,
+            "roi_score": 92,
+            "markets": ["USA", "Canada", "UK"],
+            "why": "Each new client = $5K-$50K for them; easy ROI math; low online presence",
+            "email_angle": "One new client from Google pays for your service 10x over",
+        },
+        {
+            "name": "restaurant",
+            "label": "🍽️ Restaurant",
+            "avg_deal": 1500,
+            "close_days": 5,
+            "competition": 3,
+            "demand": 5,
+            "roi_score": 88,
+            "markets": ["USA", "Canada", "UK", "Europe"],
+            "why": "Huge volume, fast close, easy to find via Google Maps, emotional owners",
+            "email_angle": "Show competitor restaurant ranking higher on Google",
+        },
+        {
+            "name": "real_estate",
+            "label": "🏠 Real Estate Agent",
+            "avg_deal": 3000,
+            "close_days": 12,
+            "competition": 4,
+            "demand": 4,
+            "roi_score": 85,
+            "markets": ["USA", "Canada"],
+            "why": "One listing = $5K-$20K commission; they understand marketing ROI",
+            "email_angle": "Agents with strong Google presence get 3x more listings",
+        },
+        {
+            "name": "gym",
+            "label": "💪 Gym / Fitness",
+            "avg_deal": 1800,
+            "close_days": 8,
+            "competition": 3,
+            "demand": 4,
+            "roi_score": 82,
+            "markets": ["USA", "Canada", "UK", "Europe"],
+            "why": "January/summer rush, membership model = recurring client value",
+            "email_angle": "Competitors gyms getting 50+ new members/month from Instagram",
+        },
+        {
+            "name": "plumber",
+            "label": "🔧 Plumber / HVAC",
+            "avg_deal": 2000,
+            "close_days": 6,
+            "competition": 2,
+            "demand": 5,
+            "roi_score": 90,
+            "markets": ["USA", "Canada"],
+            "why": "Urgent service, terrible online presence, high ticket jobs, easy wins",
+            "email_angle": "Emergency calls go to whoever ranks #1 on Google — is that you?",
+        },
+        {
+            "name": "electrician",
+            "label": "⚡ Electrician",
+            "avg_deal": 2000,
+            "close_days": 6,
+            "competition": 2,
+            "demand": 5,
+            "roi_score": 89,
+            "markets": ["USA", "Canada", "UK"],
+            "why": "Same as plumber — high demand, terrible online presence, fast close",
+            "email_angle": "Your competitor electricians are booked weeks out from Google calls",
+        },
+        {
+            "name": "chiro",
+            "label": "🧘 Chiropractor / Physio",
+            "avg_deal": 2200,
+            "close_days": 8,
+            "competition": 2,
+            "demand": 4,
+            "roi_score": 87,
+            "markets": ["USA", "Canada", "Australia"],
+            "why": "Recurring appointments, weak online presence, affluent clients",
+            "email_angle": "Patients choose chiropractors based on Google reviews — how are yours?",
+        },
+        {
+            "name": "salon",
+            "label": "💇 Salon / Spa",
+            "avg_deal": 1200,
+            "close_days": 5,
+            "competition": 3,
+            "demand": 4,
+            "roi_score": 78,
+            "markets": ["USA", "Canada", "UK", "Europe"],
+            "why": "Repeat customers, visual business perfect for Instagram/Google",
+            "email_angle": "Top salons in your area are fully booked — here's how",
+        },
+        {
+            "name": "accounting",
+            "label": "📊 Accountant / CPA",
+            "avg_deal": 3000,
+            "close_days": 14,
+            "competition": 3,
+            "demand": 4,
+            "roi_score": 83,
+            "markets": ["USA", "Canada", "UK"],
+            "why": "Tax season urgency, professional services, long-term retainer potential",
+            "email_angle": "Business owners Googling CPAs choose who appears on page 1",
+        },
+    ]
+
+    # Target market data
+    MARKETS: dict[str, dict[str, Any]] = {
+        "USA": {
+            "flag": "🇺🇸",
+            "avg_deal_multiplier": 1.0,
+            "best_niches": ["dentist", "lawyer", "plumber", "electrician", "real_estate"],
+            "best_cities": [
+                "New York", "Los Angeles", "Chicago", "Houston", "Phoenix",
+                "Philadelphia", "San Antonio", "San Diego", "Dallas", "Austin",
+                "Miami", "Atlanta", "Seattle", "Denver", "Boston",
+            ],
+            "timezone": "EST/PST",
+            "send_time": "9-11 AM EST (Tuesday-Thursday)",
+            "avg_response_rate": "4-8%",
+        },
+        "Canada": {
+            "flag": "🇨🇦",
+            "avg_deal_multiplier": 0.9,
+            "best_niches": ["dentist", "plumber", "real_estate", "lawyer", "gym"],
+            "best_cities": [
+                "Toronto", "Vancouver", "Montreal", "Calgary", "Edmonton",
+                "Ottawa", "Winnipeg", "Quebec City", "Hamilton", "Kitchener",
+            ],
+            "timezone": "EST/PST",
+            "send_time": "9-11 AM EST (Tuesday-Thursday)",
+            "avg_response_rate": "5-9%",
+        },
+        "UK": {
+            "flag": "🇬🇧",
+            "avg_deal_multiplier": 0.85,
+            "best_niches": ["dentist", "lawyer", "electrician", "salon", "accounting"],
+            "best_cities": [
+                "London", "Manchester", "Birmingham", "Leeds", "Glasgow",
+                "Liverpool", "Bristol", "Sheffield", "Edinburgh", "Leicester",
+            ],
+            "timezone": "GMT",
+            "send_time": "9-11 AM GMT (Tuesday-Thursday)",
+            "avg_response_rate": "4-7%",
+        },
+        "Europe": {
+            "flag": "🇪🇺",
+            "avg_deal_multiplier": 0.8,
+            "best_niches": ["restaurant", "gym", "salon", "dental", "accounting"],
+            "best_cities": [
+                "Berlin", "Paris", "Amsterdam", "Madrid", "Rome",
+                "Vienna", "Zurich", "Brussels", "Stockholm", "Dublin",
+            ],
+            "timezone": "CET",
+            "send_time": "9-11 AM CET (Tuesday-Thursday)",
+            "avg_response_rate": "3-6%",
+        },
+        "Australia": {
+            "flag": "🇦🇺",
+            "avg_deal_multiplier": 0.95,
+            "best_niches": ["dentist", "chiro", "plumber", "gym", "real_estate"],
+            "best_cities": [
+                "Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide",
+            ],
+            "timezone": "AEST",
+            "send_time": "9-11 AM AEST (Tuesday-Thursday)",
+            "avg_response_rate": "5-8%",
+        },
+    }
+
+    @classmethod
+    def get_top_niches(cls, market: str = "USA", top_n: int = 5) -> list[dict[str, Any]]:
+        """Return top N niches for a market, sorted by ROI score."""
+        market_data = cls.MARKETS.get(market, cls.MARKETS["USA"])
+        best = market_data["best_niches"]
+        niches = [n for n in cls.NICHES if n["name"] in best]
+        # Sort by roi_score descending
+        niches.sort(key=lambda x: x["roi_score"], reverse=True)
+        return niches[:top_n]
+
+    @classmethod
+    def get_niche(cls, name: str) -> dict[str, Any] | None:
+        """Return niche data by name."""
+        for n in cls.NICHES:
+            if n["name"] == name:
+                return n
+        return None
+
+    @classmethod
+    def score_opportunity(
+        cls,
+        niche: str,
+        market: str = "USA",
+    ) -> dict[str, Any]:
+        """Calculate opportunity score for niche+market combo."""
+        nd = cls.get_niche(niche)
+        md = cls.MARKETS.get(market, cls.MARKETS["USA"])
+        if not nd:
+            return {}
+        adj_deal = int(nd["avg_deal"] * md["avg_deal_multiplier"])
+        return {
+            "niche": nd["label"],
+            "market": f"{md['flag']} {market}",
+            "adj_deal_usd": adj_deal,
+            "roi_score": nd["roi_score"],
+            "close_days": nd["close_days"],
+            "why": nd["why"],
+            "email_angle": nd["email_angle"],
+            "send_time": md["send_time"],
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Business Strategist — CEO-level thinking, no API
+# ═════════════════════════════════════════════════════════════════════════════
+
+class BusinessStrategist:
+    """
+    Thinks like a business advisor.
+    Analyses current pipeline data + market intel to recommend the single
+    highest-ROI action the user should take right now.
+    """
+
+    @staticmethod
+    def recommend(
+        leads_stats: dict[str, Any],
+        revenue_progress: dict[str, Any],
+        market: str = "USA",
+    ) -> dict[str, Any]:
+        """
+        Return a strategic recommendation based on current state.
+
+        Returns:
+            {
+                "action": str,          # What to do NOW
+                "reason": str,          # Why this is the best move
+                "expected_result": str, # What happens if you do it
+                "niche": str,           # Best niche to focus on
+                "market": str,          # Best market to focus on
+                "quick_win": str,       # Fastest path to next revenue
+                "run_tool": str|None,   # Tool to run immediately
+            }
+        """
+        total = leads_stats.get("total", 0)
+        contacted = leads_stats.get("contacted", 0)
+        replied = leads_stats.get("replied", 0)
+        converted = leads_stats.get("converted", 0)
+        est_revenue = revenue_progress.get("est_revenue", 0)
+
+        top = MarketIntelligence.get_top_niches(market, top_n=1)
+        best_niche = top[0] if top else MarketIntelligence.NICHES[0]
+        mkt_data = MarketIntelligence.MARKETS.get(market, MarketIntelligence.MARKETS["USA"])
+
+        if total == 0:
+            return {
+                "action": "🔍 Research করো — এখনই!",
+                "reason": (
+                    f"{mkt_data['flag']} {market}-এ {best_niche['label']} "
+                    f"niche-এ ROI Score {best_niche['roi_score']}/100। "
+                    "কিন্তু লিড ছাড়া কিছুই হবে না।"
+                ),
+                "expected_result": (
+                    f"50+ লিড research করলে "
+                    f"→ 5% reply rate → 2-3 জন interested "
+                    f"→ 1 client → ${best_niche['avg_deal']:,}"
+                ),
+                "niche": best_niche["name"],
+                "market": market,
+                "quick_win": (
+                    f"Research → Outreach → {best_niche['close_days']} দিনে first client"
+                ),
+                "run_tool": "/research",
+            }
+
+        if contacted == 0:
+            reply_potential = int(total * 0.06)
+            client_potential = max(1, int(reply_potential * 0.15))
+            return {
+                "action": "📧 Email পাঠাও — এখনই!",
+                "reason": (
+                    f"{total}টি লিড আছে কিন্তু কেউ email পায়নি। "
+                    "প্রতিটি দিন delay = হারানো revenue।"
+                ),
+                "expected_result": (
+                    f"{total} email → ~{reply_potential} reply "
+                    f"→ ~{client_potential} client "
+                    f"→ ~${client_potential * best_niche['avg_deal']:,}"
+                ),
+                "niche": best_niche["name"],
+                "market": market,
+                "quick_win": f"আজই {min(total, 100)} email পাঠাও → {best_niche['close_days']} দিনে client",
+                "run_tool": "/outreach",
+            }
+
+        reply_rate = (replied / max(contacted, 1)) * 100
+        if reply_rate < 2 and contacted >= 20:
+            return {
+                "action": "✍️ Email subject line পরিবর্তন করো",
+                "reason": (
+                    f"Reply rate মাত্র {reply_rate:.1f}% — "
+                    "industry average 4-8%। Subject line সমস্যা।"
+                ),
+                "expected_result": (
+                    "Better subject line → reply rate 5%+ "
+                    f"→ {int(contacted * 0.05)} নতুন reply সম্ভব"
+                ),
+                "niche": best_niche["name"],
+                "market": market,
+                "quick_win": (
+                    "Subject: 'Quick question about [Business Name]' "
+                    "or '[City] competitor update'"
+                ),
+                "run_tool": "/outreach",
+            }
+
+        if replied > 0 and converted == 0:
+            return {
+                "action": "📞 Reply-দের Call করো — আজই!",
+                "reason": (
+                    f"{replied} জন reply করেছে কিন্তু কেউ client হয়নি! "
+                    "এরা interested — শুধু follow-up দরকার।"
+                ),
+                "expected_result": (
+                    f"{replied} reply-কে call করো "
+                    f"→ 30% close rate → "
+                    f"${int(replied * 0.3 * best_niche['avg_deal']):,} potential revenue"
+                ),
+                "niche": best_niche["name"],
+                "market": market,
+                "quick_win": (
+                    "Reply-দের WhatsApp/email করো: "
+                    "'Are you still looking for help with [problem]?'"
+                ),
+                "run_tool": "/leads",
+            }
+
+        # Default: scale up
+        monthly_revenue = converted * best_niche["avg_deal"]
+        scale_factor = max(2, int(REVENUE_GOAL / max(monthly_revenue * 12, 1) * 2))
+        return {
+            "action": "🚀 Volume বাড়াও!",
+            "reason": (
+                f"Pipeline চলছে! {converted} client, "
+                f"est. ${est_revenue:,} revenue। "
+                f"$1M-এ পৌঁছাতে {scale_factor}x বেশি leads দরকার।"
+            ),
+            "expected_result": (
+                f"Daily leads {scale_factor}x করো "
+                f"→ proportional revenue growth "
+                f"→ $1M timeline অনুযায়ী"
+            ),
+            "niche": best_niche["name"],
+            "market": market,
+            "quick_win": (
+                f"নতুন city target: {mkt_data['best_cities'][converted % len(mkt_data['best_cities'])]}"
+            ),
+            "run_tool": "/research",
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # Intent detection — keyword-based, Bengali & English
 # ═════════════════════════════════════════════════════════════════════════════
 
@@ -41,7 +430,7 @@ class IntentMatcher:
 
     INTENTS: dict[str, list[str]] = {
         "greeting": [
-            "হ্যালো", "হ্যালো", "হেলো", "আসসালামু", "সালাম",
+            "হ্যালো", "হেলো", "আসসালামু", "সালাম",
             "hi", "hello", "hey", "assalam",
         ],
         "what_to_do_today": [
@@ -116,6 +505,29 @@ class IntentMatcher:
         "next_step": [
             "পরের কাজ", "এরপর কী", "কী করব এখন", "পরবর্তী",
             "next", "after this", "what now", "then what",
+        ],
+        # ── New advanced intents ─────────────────────────────────────
+        "market_intelligence": [
+            "কোন মার্কেট", "আমেরিকা মার্কেট", "ইউরোপ", "কানাডা",
+            "কোন দেশ", "কোথায় বেশি", "মার্কেট ভ্যালু",
+            "market", "usa market", "which country", "best market",
+            "america", "europe", "canada", "uk market", "where to target",
+        ],
+        "niche_advice": [
+            "কোন নিশ সেরা", "কোনটায় বেশি লাভ", "কোন বিজনেস", "দ্রুত কোনটা",
+            "best niche", "which niche", "fastest niche", "highest paying",
+            "most profitable", "niche recommend", "which business type",
+        ],
+        "strategy": [
+            "স্ট্র্যাটেজি", "কৌশল", "কি করা উচিত", "সেরা উপায়",
+            "বেস্ট প্ল্যান", "কিভাবে স্কেল", "দ্রুত বাড়াব",
+            "strategy", "plan", "best approach", "how to scale",
+            "grow fast", "scale up", "best move", "what should i focus",
+        ],
+        "always_on": [
+            "সব সময় চালু", "background", "ফোন বন্ধ", "লক করলে",
+            "always running", "background run", "phone locked", "keep running",
+            "replit always on", "24/7", "নিরন্তর",
         ],
     }
 
@@ -372,6 +784,11 @@ class AgencyAI:
             "schedule": self._handle_schedule,
             "help": self._handle_help,
             "next_step": self._handle_next_step,
+            # ── Advanced intents ──────────────────────────────────────
+            "market_intelligence": self._handle_market,
+            "niche_advice": self._handle_niche_advice,
+            "strategy": self._handle_strategy,
+            "always_on": self._handle_always_on,
             "unknown": self._handle_unknown,
         }
         return handlers.get(intent, self._handle_unknown)
@@ -1072,4 +1489,263 @@ class AgencyAI:
             ],
             "tool_link": None,
             "run_cmd": None,
+        }
+
+    # ── Advanced handlers ─────────────────────────────────────────────────────
+
+    def _handle_market(self, msg: str) -> dict[str, Any]:
+        """Market intelligence — US/Europe/Canada breakdown."""
+        msg_lower = msg.lower()
+        if "canada" in msg_lower or "কানাডা" in msg_lower:
+            focus = "Canada"
+        elif "uk" in msg_lower or "england" in msg_lower or "britain" in msg_lower:
+            focus = "UK"
+        elif "europe" in msg_lower or "ইউরোপ" in msg_lower:
+            focus = "Europe"
+        elif "australia" in msg_lower or "অস্ট্রেলিয়া" in msg_lower:
+            focus = "Australia"
+        else:
+            focus = "USA"
+
+        rows = []
+        for mkt, data in MarketIntelligence.MARKETS.items():
+            top = MarketIntelligence.get_top_niches(mkt, top_n=3)
+            niche_names = ", ".join(n["label"] for n in top)
+            star = " ⭐" if mkt == focus else ""
+            rows.append(
+                f"| {data['flag']} **{mkt}**{star} "
+                f"| {niche_names} "
+                f"| {data['avg_response_rate']} "
+                f"| {data['send_time']} |"
+            )
+
+        focus_data = MarketIntelligence.MARKETS[focus]
+        top_niches = MarketIntelligence.get_top_niches(focus, top_n=3)
+
+        niche_details = "\n".join(
+            f"**{i + 1}. {n['label']}** (ROI: {n['roi_score']}/100)\n"
+            f"   → Avg deal: ${n['avg_deal']:,} | Close: {n['close_days']} days\n"
+            f"   → Why: {n['why']}"
+            for i, n in enumerate(top_niches)
+        )
+
+        return {
+            "reply": (
+                f"## 🌍 Market Intelligence\n\n"
+                f"**তোমার primary market: {focus_data['flag']} {focus}**\n\n"
+                f"| Market | Best Niches | Reply Rate | Best Send Time |\n"
+                f"|--------|-------------|-----------|---------------|\n"
+                + "\n".join(rows)
+                + f"\n\n---\n\n"
+                f"## {focus_data['flag']} {focus} — Top 3 Niches:\n\n"
+                + niche_details
+                + f"\n\n**Best cities to target:**\n"
+                + ", ".join(focus_data["best_cities"][:6])
+                + f"\n\n**Send time:** {focus_data['send_time']}"
+            ),
+            "quick_actions": [
+                {"label": "🇺🇸 USA Details", "msg": "USA market কেমন?"},
+                {"label": "🇨🇦 Canada Details", "msg": "Canada market কেমন?"},
+                {"label": "🎯 Best Niche বেছে দাও", "msg": "কোন niche সেরা?"},
+                {"label": "🔍 Research শুরু", "msg": "__goto__/research"},
+            ],
+            "tool_link": "/research",
+            "run_cmd": None,
+        }
+
+    def _handle_niche_advice(self, msg: str) -> dict[str, Any]:
+        """AI-powered niche recommendation with ROI ranking."""
+        market = "USA"
+        for h in self._history:
+            txt = h.get("content", "").lower()
+            if "canada" in txt or "কানাডা" in txt:
+                market = "Canada"
+                break
+            if "uk" in txt or "england" in txt:
+                market = "UK"
+                break
+
+        top5 = MarketIntelligence.get_top_niches(market, top_n=5)
+        mkt = MarketIntelligence.MARKETS[market]
+
+        medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+        rows = []
+        for i, n in enumerate(top5):
+            competition_bar = "🔴" * n["competition"] + "⚪" * (5 - n["competition"])
+            rows.append(
+                f"| {medals[i]} {n['label']} "
+                f"| ${n['avg_deal']:,} "
+                f"| {n['close_days']} days "
+                f"| {n['roi_score']}/100 "
+                f"| {competition_bar} |"
+            )
+
+        best = top5[0]
+        return {
+            "reply": (
+                f"## 🎯 AI Niche Recommendation — {mkt['flag']} {market}\n\n"
+                f"**#1 সুপারিশ: {best['label']}** (ROI Score: {best['roi_score']}/100)\n\n"
+                f"> {best['why']}\n\n"
+                f"**Email angle:** _{best['email_angle']}_\n\n"
+                f"---\n\n"
+                f"**Top 5 Niches Ranked:**\n\n"
+                f"| Rank | Niche | Deal Size | Close Speed | ROI | Competition |\n"
+                f"|------|-------|-----------|-------------|-----|-------------|\n"
+                + "\n".join(rows)
+                + f"\n\n**💡 Strategy:** শুরু করো {best['label']} দিয়ে।\n"
+                f"প্রতিদিন 50 লিড → 5% reply → "
+                f"${int(50 * 0.05 * best['avg_deal']):,}/week potential"
+            ),
+            "quick_actions": [
+                {"label": f"🔍 Research শুরু", "msg": "__goto__/research"},
+                {"label": "🌍 Market দেখাও", "msg": "market intelligence দেখাও"},
+                {"label": "📈 Strategy দাও", "msg": "আমার জন্য best strategy কী?"},
+            ],
+            "tool_link": "/research",
+            "run_cmd": None,
+        }
+
+    def _handle_strategy(self, _msg: str) -> dict[str, Any]:
+        """CEO-level strategic recommendation based on current pipeline."""
+        stats = self.ctx.get_leads_stats()
+        rev = self.ctx.get_revenue_progress()
+        rec = BusinessStrategist.recommend(stats, rev, market="USA")
+
+        total = stats.get("total", 0)
+        contacted = stats.get("contacted", 0)
+        replied = stats.get("replied", 0)
+        converted = stats.get("converted", 0)
+        reply_rate = round((replied / max(contacted, 1)) * 100, 1)
+        close_rate = round((converted / max(replied, 1)) * 100, 1)
+
+        funnel = (
+            "**Pipeline Funnel:**\n"
+            "```\n"
+            f"Leads:     {total:>6}\n"
+            f"Contacted: {contacted:>6}  ({round(contacted / max(total, 1) * 100)}%)\n"
+            f"Replied:   {replied:>6}  ({reply_rate}%)\n"
+            f"Converted: {converted:>6}  ({close_rate}%)\n"
+            f"Revenue:   ${rev['est_revenue']:>6,}\n"
+            "```\n"
+        )
+
+        best_niche = MarketIntelligence.get_niche(rec["niche"])
+        niche_label = best_niche["label"] if best_niche else rec["niche"]
+
+        return {
+            "reply": (
+                "## 🧠 AI Strategic Analysis\n\n"
+                + funnel
+                + "\n---\n\n"
+                "## 🎯 #1 Priority Action:\n\n"
+                f"### {rec['action']}\n\n"
+                f"**কেন এটা করব:** {rec['reason']}\n\n"
+                f"**কী হবে:** {rec['expected_result']}\n\n"
+                f"**Quick Win:** {rec['quick_win']}\n\n"
+                "---\n\n"
+                f"**Best Niche এখন:** {niche_label}\n"
+                f"**Target Market:** {rec['market']}\n\n"
+                "_এই একটা কাজ করো — বাকি সব পরে।_"
+            ),
+            "quick_actions": [
+                {
+                    "label": "▶️ এখনই করো",
+                    "msg": f"__goto__{rec.get('run_tool', '/')}",
+                },
+                {"label": "🎯 Best Niche", "msg": "কোন niche সেরা?"},
+                {"label": "🌍 Market Intel", "msg": "market intelligence দেখাও"},
+                {"label": "📊 Progress", "msg": "আমার progress?"},
+            ],
+            "tool_link": rec.get("run_tool"),
+            "run_cmd": None,
+        }
+
+    def _handle_always_on(self, _msg: str) -> dict[str, Any]:
+        """Guide for keeping the app always running."""
+        return {
+            "reply": (
+                "## 🔄 App সবসময় Running রাখার উপায়\n\n"
+                "ফোন lock হলেও চলবে — এই ৩টি উপায়:\n\n"
+                "---\n\n"
+                "## ✅ উপায় ১: Replit Always-On (সহজ)\n\n"
+                "**GitHub Education দিয়ে FREE পাবে!**\n\n"
+                "**ধাপ ১:** replit.com → তোমার Repl খোলো\n\n"
+                "**ধাপ ২:** `Deployments` tab ক্লিক করো\n\n"
+                "**ধাপ ৩:** `Reserved VM` বা `Always On` enable করো\n"
+                "→ GitHub Education = Replit Hacker plan free!\n\n"
+                "**ধাপ ৪:** Deploy করো → ২৪/৭ চলবে!\n\n"
+                "---\n\n"
+                "## ✅ উপায় ২: UptimeRobot (Ping করে জাগিয়ে রাখে)\n\n"
+                "**ধাপ ১:** uptimerobot.com → Free account\n\n"
+                "**ধাপ ২:** `Add New Monitor`\n"
+                "→ Type: HTTP(s)\n"
+                "→ URL: তোমার Replit URL\n"
+                "→ Interval: 5 minutes\n\n"
+                "**ধাপ ৩:** Save → App কখনো sleep যাবে না!\n\n"
+                "---\n\n"
+                "## ✅ উপায় ৩: Termux:Boot (Android)\n\n"
+                "**ধাপ ১:** F-Droid থেকে `Termux:Boot` install করো\n\n"
+                "**ধাপ ২:** Boot script তৈরি করো:\n"
+                "```\nmkdir -p ~/.termux/boot\n"
+                "cat > ~/.termux/boot/start-app.sh << 'EOF'\n"
+                "#!/data/data/com.termux/files/usr/bin/sh\n"
+                "cd ~/agency-research-automation-1m\n"
+                "python scripts/web_app.py &\n"
+                "EOF\n"
+                "chmod +x ~/.termux/boot/start-app.sh\n```\n\n"
+                "**ধাপ ৩:** ফোন restart → App auto-start!\n\n"
+                "---\n\n"
+                "**💡 Best Choice:**\n"
+                "**Replit + UptimeRobot** = সবচেয়ে reliable, সব free!\n"
+                "GitHub Education account দিয়ে Replit Hacker plan পাবে।"
+            ),
+            "quick_actions": [
+                {"label": "🟢 Replit Setup", "msg": "Replit-এ কিভাবে চালাব?"},
+                {"label": "📱 Termux Setup", "msg": "Termux-এ কিভাবে চালাব?"},
+                {"label": "🔑 GitHub Education", "msg": "API key কোথায় পাব?"},
+            ],
+            "tool_link": None,
+            "run_cmd": None,
+        }
+
+    # ── Public: recommendation API (called from web routes) ───────────────────
+
+    def get_strategy_recommendation(self, market: str = "USA") -> dict[str, Any]:
+        """
+        Return a full strategic recommendation for the /api/ai/recommend endpoint.
+
+        Combines pipeline analysis + market intel + niche advice into one response.
+        """
+        stats = self.ctx.get_leads_stats()
+        rev = self.ctx.get_revenue_progress()
+        rec = BusinessStrategist.recommend(stats, rev, market=market)
+        top_niches = MarketIntelligence.get_top_niches(market, top_n=3)
+        mkt = MarketIntelligence.MARKETS.get(market, MarketIntelligence.MARKETS["USA"])
+
+        return {
+            "market": market,
+            "market_flag": mkt["flag"],
+            "recommendation": rec,
+            "top_niches": [
+                {
+                    "name": n["name"],
+                    "label": n["label"],
+                    "roi_score": n["roi_score"],
+                    "avg_deal": n["avg_deal"],
+                    "close_days": n["close_days"],
+                    "why": n["why"],
+                    "email_angle": n["email_angle"],
+                }
+                for n in top_niches
+            ],
+            "pipeline": {
+                "total": stats.get("total", 0),
+                "contacted": stats.get("contacted", 0),
+                "replied": stats.get("replied", 0),
+                "converted": stats.get("converted", 0),
+                "est_revenue": rev.get("est_revenue", 0),
+                "goal_pct": rev.get("pct", 0),
+            },
+            "best_cities": mkt["best_cities"][:6],
+            "send_time": mkt["send_time"],
         }
