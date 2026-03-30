@@ -1,0 +1,4 @@
+# Minimal requirements — only what web_app.py needs
+# Install: pip install -r requirements-minimal.txt
+flask>=3.0.0
+requests>=2.31.0
