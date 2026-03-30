@@ -1744,10 +1744,68 @@ def ai_page() -> str:
         font-size:.72rem;cursor:pointer;padding:4px 8px;border:1px solid var(--border);
         border-radius:6px;">🗑 Clear</button>
   </div>
+
+  <!-- Tab bar -->
+  <div style="display:flex;gap:4px;margin-top:6px;">
+    <button id="tab-chat" onclick="showTab('chat')"
+      style="flex:1;padding:7px 4px;border-radius:8px 8px 0 0;border:1px solid var(--border);
+        border-bottom:none;background:var(--card);font-size:.78rem;font-weight:600;cursor:pointer;">
+      💬 Chat</button>
+    <button id="tab-strategy" onclick="showTab('strategy')"
+      style="flex:1;padding:7px 4px;border-radius:8px 8px 0 0;border:1px solid var(--border);
+        border-bottom:none;background:var(--surface);font-size:.78rem;cursor:pointer;">
+      🧠 Strategy</button>
+    <button id="tab-market" onclick="showTab('market')"
+      style="flex:1;padding:7px 4px;border-radius:8px 8px 0 0;border:1px solid var(--border);
+        border-bottom:none;background:var(--surface);font-size:.78rem;cursor:pointer;">
+      🌍 Market</button>
+  </div>
 </div>
 
-<div style="padding:0 13px 13px;">
-  <div class="chat-wrap">
+<!-- ── Strategy Panel ── -->
+<div id="panel-strategy" style="display:none;padding:0 13px 13px;">
+  <div style="border:1px solid var(--border);border-radius:0 0 12px 12px;
+    background:var(--card);padding:13px;">
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <select id="mkt-select" onchange="loadStrategy()"
+        style="flex:1;min-width:110px;padding:7px 10px;border-radius:8px;
+          border:1px solid var(--border);background:var(--surface);
+          color:var(--text);font-size:.82rem;">
+        <option value="USA">🇺🇸 USA</option>
+        <option value="Canada">🇨🇦 Canada</option>
+        <option value="UK">🇬🇧 UK</option>
+        <option value="Europe">🇪🇺 Europe</option>
+        <option value="Australia">🇦🇺 Australia</option>
+      </select>
+      <button onclick="loadStrategy()"
+        style="padding:7px 14px;border-radius:8px;border:none;
+          background:var(--primary);color:#fff;font-size:.82rem;cursor:pointer;">
+        🔄 Refresh</button>
+    </div>
+    <div id="strategy-loading" style="text-align:center;padding:20px;color:var(--muted);">
+      <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+    </div>
+    <div id="strategy-content" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ── Market Intel Panel ── -->
+<div id="panel-market" style="display:none;padding:0 13px 13px;">
+  <div style="border:1px solid var(--border);border-radius:0 0 12px 12px;
+    background:var(--card);padding:13px;">
+    <div style="font-weight:700;margin-bottom:8px;font-size:.88rem;">
+      🌍 Target Markets — USA, Canada, UK, Europe</div>
+    <div id="market-content">
+      <div style="text-align:center;padding:20px;color:var(--muted);">
+        <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Chat Panel ── -->
+<div id="panel-chat" style="padding:0 13px 13px;">
+  <div class="chat-wrap" style="border-radius:0 0 12px 12px;">
     <div class="chat-msgs" id="chat-msgs">
       <!-- Initial briefing message -->
       <div class="msg msg-ai" id="briefing-msg">
@@ -1763,8 +1821,10 @@ def ai_page() -> str:
       <button class="quick-btn" onclick="sendQuick('আমার progress কেমন?')">📊 Progress</button>
       <button class="quick-btn" onclick="sendQuick('কিভাবে রিসার্চ করব?')">🔍 Research</button>
       <button class="quick-btn" onclick="sendQuick('কিভাবে email পাঠাব?')">📧 Email</button>
+      <button class="quick-btn" onclick="sendQuick('কোন niche সেরা?')">🎯 Best Niche</button>
+      <button class="quick-btn" onclick="sendQuick('আমার জন্য best strategy কী?')">🧠 Strategy</button>
+      <button class="quick-btn" onclick="sendQuick('app সবসময় running রাখব কিভাবে?')">🔄 Always-On</button>
       <button class="quick-btn" onclick="sendQuick('$1M revenue কিভাবে?')">💰 Revenue</button>
-      <button class="quick-btn" onclick="sendQuick('help')">🆘 Help</button>
     </div>
 
     <div class="chat-input-row">
@@ -1785,6 +1845,148 @@ def ai_page() -> str:
     extra = f"""<script>
 var BRIEFING = {json.dumps(briefing)};
 var chatMsgs = document.getElementById('chat-msgs');
+
+/* ── Tab switching ── */
+function showTab(name) {{
+  ['chat','strategy','market'].forEach(function(t) {{
+    document.getElementById('panel-'+t).style.display = (t===name) ? '' : 'none';
+    var btn = document.getElementById('tab-'+t);
+    if (btn) {{
+      btn.style.background = (t===name) ? 'var(--card)' : 'var(--surface)';
+      btn.style.fontWeight = (t===name) ? '600' : '400';
+    }}
+  }});
+  if (name==='strategy') loadStrategy();
+  if (name==='market') loadMarket();
+}}
+
+/* ── Strategy Panel ── */
+function loadStrategy() {{
+  var market = document.getElementById('mkt-select').value;
+  document.getElementById('strategy-loading').style.display = '';
+  document.getElementById('strategy-content').style.display = 'none';
+  fetch('/api/ai/recommend?market=' + encodeURIComponent(market))
+  .then(function(r){{ return r.json(); }})
+  .then(function(d) {{
+    document.getElementById('strategy-loading').style.display = 'none';
+    var sc = document.getElementById('strategy-content');
+    sc.style.display = '';
+    var rec = d.recommendation || {{}};
+    var niches = d.top_niches || [];
+    var pipe = d.pipeline || {{}};
+
+    // Funnel bar
+    var funnelHtml = '<div style="margin-bottom:12px;">' +
+      '<div style="font-weight:700;font-size:.82rem;margin-bottom:6px;">📊 Pipeline</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+      mkBadge('Leads','#4f8ef7',pipe.total||0) +
+      mkBadge('Contacted','#6f42c1',pipe.contacted||0) +
+      mkBadge('Replied','#20c997',pipe.replied||0) +
+      mkBadge('Clients','#fd7e14',pipe.converted||0) +
+      '</div>' +
+      '<div style="margin-top:6px;font-size:.75rem;color:var(--muted);">' +
+      'Est. Revenue: <strong>$' + (pipe.est_revenue||0).toLocaleString() + '</strong>' +
+      ' &nbsp;|&nbsp; Goal: <strong>' + (pipe.goal_pct||0) + '%</strong> of $1M' +
+      '</div></div>';
+
+    // #1 Action card
+    var actionHtml = '<div style="background:linear-gradient(135deg,var(--primary),#6f42c1);' +
+      'color:#fff;border-radius:12px;padding:12px;margin-bottom:12px;">' +
+      '<div style="font-size:.72rem;opacity:.85;margin-bottom:4px;">🎯 #1 Priority Action</div>' +
+      '<div style="font-weight:700;font-size:.95rem;margin-bottom:6px;">' + escHtml(rec.action||'') + '</div>' +
+      '<div style="font-size:.76rem;opacity:.9;margin-bottom:8px;">' + escHtml(rec.reason||'') + '</div>' +
+      '<div style="font-size:.74rem;background:rgba(255,255,255,.15);border-radius:8px;padding:7px;">' +
+      '⚡ ' + escHtml(rec.quick_win||'') + '</div></div>';
+
+    // Run button
+    var runBtn = '';
+    if (rec.run_tool) {{
+      runBtn = '<a href="' + rec.run_tool + '" style="display:block;text-align:center;' +
+        'background:var(--primary);color:#fff;padding:10px;border-radius:10px;' +
+        'text-decoration:none;font-weight:700;font-size:.86rem;margin-bottom:12px;">' +
+        '▶️ এখনই করো → ' + rec.run_tool + '</a>';
+    }}
+
+    // Top niches
+    var nichesHtml = '<div style="font-weight:700;font-size:.82rem;margin-bottom:8px;">' +
+      d.market_flag + ' ' + d.market + ' — Top Niches</div>' +
+      '<div style="display:flex;flex-direction:column;gap:7px;">';
+    niches.forEach(function(n,i) {{
+      var bar = Math.round(n.roi_score / 100 * 100);
+      nichesHtml += '<div style="background:var(--surface);border-radius:10px;padding:10px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span style="font-weight:600;font-size:.83rem;">' + ['🥇','🥈','🥉'][i] + ' ' + escHtml(n.label) + '</span>' +
+        '<span style="font-size:.72rem;color:var(--muted);">ROI: <strong>' + n.roi_score + '</strong>/100</span>' +
+        '</div>' +
+        '<div style="height:4px;background:var(--border);border-radius:4px;margin:5px 0;">' +
+        '<div style="height:100%;width:' + bar + '%;background:var(--primary);border-radius:4px;"></div></div>' +
+        '<div style="font-size:.72rem;color:var(--muted);">$' + n.avg_deal.toLocaleString() + ' avg &bull; ' +
+        n.close_days + ' days close</div>' +
+        '<div style="font-size:.71rem;margin-top:4px;color:var(--text);">' + escHtml(n.why) + '</div>' +
+        '</div>';
+    }});
+    nichesHtml += '</div>';
+
+    // Best cities
+    var citiesHtml = '<div style="margin-top:10px;font-size:.76rem;color:var(--muted);">' +
+      '🏙️ Target cities: <strong>' + (d.best_cities||[]).join(', ') + '</strong></div>' +
+      '<div style="font-size:.76rem;color:var(--muted);margin-top:3px;">' +
+      '⏰ Best send time: <strong>' + escHtml(d.send_time||'') + '</strong></div>';
+
+    sc.innerHTML = funnelHtml + actionHtml + runBtn + nichesHtml + citiesHtml;
+  }})
+  .catch(function(e) {{
+    document.getElementById('strategy-loading').style.display = 'none';
+    document.getElementById('strategy-content').style.display = '';
+    document.getElementById('strategy-content').innerHTML =
+      '<div style="color:var(--danger);font-size:.8rem;">❌ ' + escHtml(e.message) + '</div>';
+  }});
+}}
+
+function mkBadge(label, color, val) {{
+  return '<div style="background:' + color + '22;border:1px solid ' + color + '44;' +
+    'border-radius:8px;padding:5px 10px;text-align:center;min-width:55px;">' +
+    '<div style="font-size:.7rem;color:var(--muted);">' + label + '</div>' +
+    '<div style="font-weight:700;font-size:.95rem;color:' + color + ';">' + val + '</div></div>';
+}}
+
+/* ── Market Intel Panel ── */
+function loadMarket() {{
+  var mc = document.getElementById('market-content');
+  if (mc.dataset.loaded) return;
+  mc.dataset.loaded = '1';
+
+  var markets = [
+    {{id:'USA', flag:'🇺🇸', niches:['🦷 Dentist','⚖️ Lawyer','🔧 Plumber','⚡ Electrician','🏠 Real Estate'],
+      rate:'4-8%', time:'9-11 AM EST Tue-Thu', cities:['New York','Los Angeles','Chicago','Houston','Phoenix']}},
+    {{id:'Canada', flag:'🇨🇦', niches:['🦷 Dentist','🔧 Plumber','🏠 Real Estate','⚖️ Lawyer','💪 Gym'],
+      rate:'5-9%', time:'9-11 AM EST Tue-Thu', cities:['Toronto','Vancouver','Calgary','Ottawa','Montreal']}},
+    {{id:'UK', flag:'🇬🇧', niches:['🦷 Dentist','⚖️ Lawyer','⚡ Electrician','💇 Salon','📊 Accountant'],
+      rate:'4-7%', time:'9-11 AM GMT Tue-Thu', cities:['London','Manchester','Birmingham','Leeds','Glasgow']}},
+    {{id:'Europe', flag:'🇪🇺', niches:['🍽️ Restaurant','💪 Gym','💇 Salon','🦷 Dentist','📊 Accountant'],
+      rate:'3-6%', time:'9-11 AM CET Tue-Thu', cities:['Berlin','Paris','Amsterdam','Madrid','Dublin']}},
+    {{id:'Australia', flag:'🇦🇺', niches:['🦷 Dentist','🧘 Chiro','🔧 Plumber','💪 Gym','🏠 Real Estate'],
+      rate:'5-8%', time:'9-11 AM AEST Tue-Thu', cities:['Sydney','Melbourne','Brisbane','Perth','Adelaide']}}
+  ];
+  var html = '<div style="display:flex;flex-direction:column;gap:10px;">';
+  markets.forEach(function(m) {{
+    html += '<div style="background:var(--surface);border-radius:12px;padding:12px;">' +
+      '<div style="font-weight:700;font-size:.88rem;margin-bottom:6px;">' +
+      m.flag + ' ' + m.id +
+      ' <span style="font-size:.7rem;color:var(--success);font-weight:400;">Reply: ' + m.rate + '</span></div>' +
+      '<div style="font-size:.74rem;color:var(--muted);margin-bottom:5px;">⏰ ' + m.time + '</div>' +
+      '<div style="font-size:.74rem;margin-bottom:5px;"><strong>Top Niches:</strong> ' + m.niches.join(' &bull; ') + '</div>' +
+      '<div style="font-size:.73rem;color:var(--muted);">🏙️ ' + m.cities.join(', ') + '</div>' +
+      '<button onclick="document.getElementById(\'mkt-select\').value=\'' + m.id +
+      '\';showTab(\'strategy\')" style="margin-top:8px;width:100%;padding:7px;border-radius:8px;' +
+      'border:none;background:var(--primary);color:#fff;font-size:.76rem;cursor:pointer;">' +
+      '🎯 ' + m.id + ' Strategy দেখো</button></div>';
+  }});
+  html += '</div>';
+  mc.innerHTML = html;
+}}
+
+/* ── Chat ── */
 
 /* Show briefing after short delay (feels natural) */
 setTimeout(function() {{
@@ -1898,7 +2100,7 @@ function clearChat() {{
 }}
 
 function escHtml(t) {{
-  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }}
 </script>"""
     return page(f"{tpl}", "ai", extra)
@@ -1952,6 +2154,29 @@ def api_ai_briefing() -> Response:
     if ai is None:
         return jsonify({"reply": "AI not available.", "quick_actions": []})
     return jsonify(ai.daily_briefing())
+
+
+@app.route("/api/ai/recommend")
+def api_ai_recommend() -> Response:
+    """
+    Return a full strategic recommendation: best niche, market, and #1 action.
+
+    Query param: ?market=USA  (default USA; also Canada, UK, Europe, Australia)
+    """
+    ai = get_ai()
+    if ai is None:
+        return jsonify({"error": "AI not available."}), 503
+
+    market = request.args.get("market", "USA").strip()
+    allowed = {"USA", "Canada", "UK", "Europe", "Australia"}
+    if market not in allowed:
+        market = "USA"
+
+    try:
+        data = ai.get_strategy_recommendation(market=market)
+        return jsonify(data)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": str(exc)}), 500
 
 
 # ═════════════════════════════════════════════════════════════════════════════
