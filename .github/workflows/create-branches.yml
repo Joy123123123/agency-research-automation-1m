@@ -13,6 +13,7 @@ on:
 
 jobs:
   create-branches:
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.confirm == 'yes'
     name: Create Standard Git Branches
     runs-on: ubuntu-latest
     permissions:
