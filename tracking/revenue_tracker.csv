@@ -1,0 +1,5 @@
+month,week,clients,monthly_recurring_revenue,one_time_revenue,total_revenue,cumulative_revenue,notes
+Month 1,Week 1,0,0,0,0,0,Starting period
+Month 1,Week 2,1,0,500,500,500,First pilot client
+Month 1,Week 3,2,0,1000,1000,1500,Second pilot
+Month 1,Week 4,3,1500,500,2000,3500,First retainer
