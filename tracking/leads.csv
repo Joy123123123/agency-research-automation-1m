@@ -1,0 +1,3 @@
+# Lead Tracking — Agency Research Automation
+# CSV Headers: name,niche,location,email,phone,website,has_website,google_rating,review_count,lead_score,grade,priority,status,contacted_at,replied_at,converted_at,created_at
+name,niche,location,email,phone,website,has_website,google_rating,review_count,lead_score,grade,priority,status,contacted_at,replied_at,converted_at,created_at

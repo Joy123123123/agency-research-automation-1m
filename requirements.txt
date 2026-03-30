@@ -1,0 +1,53 @@
+# Agency Research Automation — Python Dependencies
+# Install: pip install -r requirements.txt
+
+# Core HTTP & Async
+aiohttp>=3.9.5
+requests>=2.31.0
+httpx>=0.25.0
+
+# Web Scraping
+beautifulsoup4>=4.12.0
+selenium>=4.15.0
+playwright>=1.40.0
+lxml>=4.9.0
+
+# AI & Machine Learning
+openai>=1.12.0
+google-generativeai>=0.4.0
+langchain>=0.1.0
+
+# Data Processing
+pandas>=2.1.0
+numpy>=1.26.0
+openpyxl>=3.1.0
+python-dotenv>=1.0.0
+
+# Email
+sendgrid>=6.11.0
+mailchimp-marketing>=3.0.75
+
+# Database
+airtable-python-wrapper>=0.15.3
+notion-client>=2.2.1
+sqlalchemy>=2.0.0
+
+# Scheduling
+schedule>=1.2.0
+celery>=5.3.0
+
+# Reporting & Templates
+jinja2>=3.1.0
+weasyprint>=60.0
+reportlab>=4.0.0
+
+# Utilities
+tqdm>=4.66.0
+rich>=13.7.0
+click>=8.1.0
+pydantic>=2.5.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
