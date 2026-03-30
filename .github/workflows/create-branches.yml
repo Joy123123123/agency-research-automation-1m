@@ -2,11 +2,6 @@ name: 🌿 Create All Standard Branches
 
 on:
   workflow_dispatch:
-    inputs:
-      confirm:
-        description: 'Type "yes" to create all branches'
-        required: true
-        default: 'yes'
   push:
     branches:
       - main
@@ -14,178 +9,59 @@ on:
 
 jobs:
   create-branches:
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.confirm == 'yes'
-    name: Create Standard Git Branches
+    name: Create Standard Git Branches via API
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Create branches using GitHub API
+        uses: actions/github-script@v7
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = context.sha;
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+            const branches = [
+              'develop',
+              'staging',
+              'hotfix',
+              'release/v1.0',
+            ];
 
-      - name: Create develop branch
-        run: |
-          if git ls-remote --exit-code --heads origin develop; then
-            echo "✅ Branch 'develop' already exists"
-          else
-            git checkout -b develop
-            cat > DEVELOP.md << 'MDEOF'
-# DEVELOP Branch — Agency Research Automation
+            console.log(`Base SHA: ${sha}`);
+            console.log(`Creating branches from: ${context.ref}`);
 
-এই ব্রাঞ্চ হলো **ডেভেলপমেন্ট ইন্টিগ্রেশন ব্রাঞ্চ**।
+            for (const branch of branches) {
+              try {
+                // Check if branch exists
+                await github.rest.git.getRef({
+                  owner, repo,
+                  ref: `heads/${branch}`
+                });
+                console.log(`✅ Branch '${branch}' already exists — skipping`);
+              } catch (e) {
+                if (e.status === 404) {
+                  // Create the branch
+                  await github.rest.git.createRef({
+                    owner, repo,
+                    ref: `refs/heads/${branch}`,
+                    sha: sha
+                  });
+                  console.log(`🎉 Created branch: ${branch}`);
+                } else {
+                  console.error(`❌ Error checking branch '${branch}': ${e.message}`);
+                }
+              }
+            }
 
-সব `feature/*` ব্রাঞ্চ এখানে merge হবে।
+            // List all branches
+            const { data: allBranches } = await github.rest.repos.listBranches({
+              owner, repo, per_page: 50
+            });
+            console.log('\n📋 All branches in repository:');
+            allBranches.forEach(b => console.log(`  - ${b.name}`));
 
-**Workflow:** `feature/* → develop → staging → main`
-
-## Rules
-- Never push directly to `main`
-- All PRs must target `develop` first
-- Tests must pass before merging to `staging`
-MDEOF
-            git add DEVELOP.md
-            git commit -m "chore: initialize develop branch"
-            git push origin develop
-            git checkout -
-            echo "✅ Created 'develop' branch"
-          fi
-
-      - name: Create staging branch
-        run: |
-          if git ls-remote --exit-code --heads origin staging; then
-            echo "✅ Branch 'staging' already exists"
-          else
-            git checkout ${{ github.sha }}
-            git checkout -b staging
-            cat > STAGING.md << 'MDEOF'
-# STAGING Branch — Agency Research Automation
-
-এই ব্রাঞ্চ হলো **প্রি-প্রোডাকশন টেস্টিং ব্রাঞ্চ**।
-
-`develop` থেকে merge আসে। Production-এ যাওয়ার আগে এখানে সব কিছু টেস্ট হয়।
-
-## Rules
-- QA/UAT testing happens here
-- Must pass all integration tests before merging to `main`
-- No direct commits — only merges from `develop`
-MDEOF
-            git add STAGING.md
-            git commit -m "chore: initialize staging branch"
-            git push origin staging
-            git checkout -
-            echo "✅ Created 'staging' branch"
-          fi
-
-      - name: Create hotfix branch
-        run: |
-          if git ls-remote --exit-code --heads origin hotfix; then
-            echo "✅ Branch 'hotfix' already exists"
-          else
-            git checkout ${{ github.sha }}
-            git checkout -b hotfix
-            cat > HOTFIX.md << 'MDEOF'
-# HOTFIX Branch — Agency Research Automation
-
-এই ব্রাঞ্চ হলো **ইমার্জেন্সি প্রোডাকশন ফিক্স ব্রাঞ্চ**।
-
-শুধুমাত্র critical production bugs fix করতে এই branch ব্যবহার করুন।
-
-## Usage
-```bash
-git checkout hotfix
-git checkout -b hotfix/fix-description
-# ... make fix ...
-git commit -m "fix: description"
-# Merge into main AND develop
-```
-
-## Rules
-- Only for critical bugs in production
-- After merging to `main`, also merge into `develop`
-- Bump version (e.g., v1.0.1)
-MDEOF
-            git add HOTFIX.md
-            git commit -m "chore: initialize hotfix branch"
-            git push origin hotfix
-            git checkout -
-            echo "✅ Created 'hotfix' branch"
-          fi
-
-      - name: Create release/v1.0 branch
-        run: |
-          if git ls-remote --exit-code --heads origin release/v1.0; then
-            echo "✅ Branch 'release/v1.0' already exists"
-          else
-            git checkout ${{ github.sha }}
-            git checkout -b release/v1.0
-            cat > RELEASE_NOTES.md << 'MDEOF'
-# Release v1.0.0 — Agency Research Automation
-**Release Date:** 2026-04-01
-**Owner:** Md Jamil Islam
-
-## 🎉 What's New in v1.0.0
-
-### Core Features
-- ✅ Agency discovery via Google Maps API
-- ✅ Contact scraping (email, phone, social media)
-- ✅ Market analysis & opportunity scoring
-- ✅ AI-powered email content generation (OpenAI + Gemini)
-- ✅ Automated outreach via SendGrid
-- ✅ 4-step automated follow-up sequence
-- ✅ Weekly/monthly HTML & CSV reports
-- ✅ Daily task scheduler
-
-### Supported Niches
-Restaurant, Dentist, Lawyer, Real Estate, Gym, Salon, Hotel, Pharmacy
-
-### Tech Stack
-Python 3.10+, SendGrid, OpenAI/Gemini, Airtable, Google Maps API
-
-## Installation
-```bash
-git clone https://github.com/Joy123123123/agency-research-automation-1m.git
-cd agency-research-automation-1m
-bash scripts/setup.sh
-```
-
-## Known Issues
-None in v1.0.0
-
-## Upcoming (v1.1.0)
-- LinkedIn outreach automation
-- WhatsApp Business API
-- Real-time Streamlit dashboard
-MDEOF
-            git add RELEASE_NOTES.md
-            git commit -m "chore: initialize release/v1.0 branch with release notes"
-            git push origin release/v1.0
-            git checkout -
-            echo "✅ Created 'release/v1.0' branch"
-          fi
-
-      - name: Summary
-        run: |
-          echo ""
-          echo "🎉 Branch Setup Complete!"
-          echo ""
-          echo "Branches now in repository:"
-          git --no-pager branch -a
-          echo ""
-          echo "📊 Branch Strategy:"
-          echo "  main          ← Production (stable)"
-          echo "  develop       ← Integration (all features merge here)"
-          echo "  staging       ← Pre-production testing"
-          echo "  release/v1.0  ← Current release preparation"
-          echo "  hotfix        ← Emergency production fixes"
-          echo "  feature/*     ← New feature development"
 
