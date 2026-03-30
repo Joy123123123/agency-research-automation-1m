@@ -1,0 +1,2 @@
+id,company_name,contact_name,contact_title,contact_email,phone,linkedin_url,industry,location,status,lead_source,first_contact_date,last_contact_date,next_followup_date,proposal_sent,proposal_amount,notes,deal_value,closed_date
+001,Example Company,Jane Smith,CEO,jane@example.com,+1-555-0100,https://linkedin.com/in/janesmith,Digital Marketing,New York USA,Lead,Cold Email,2026-01-01,2026-01-01,2026-01-04,No,0,Initial outreach sent,0,
