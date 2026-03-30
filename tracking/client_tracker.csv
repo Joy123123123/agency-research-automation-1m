@@ -1,0 +1,2 @@
+id,company_name,website,contact_name,contact_title,email,phone,linkedin_url,industry,employee_count,location,annual_revenue_estimate,lead_score,source,date_added,status,notes
+LEAD-0001,Example Marketing Agency,https://example.com,John Doe,CEO,john@example.com,+1-555-000-0001,https://linkedin.com/in/johndoe,Digital Marketing,10,"New York, US",$500K,8,Manual,2024-01-01,new,Sample lead - replace with real data

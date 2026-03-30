@@ -1,0 +1,2 @@
+date,campaign,emails_sent,emails_failed,replies,reply_rate,calls_booked,calls_completed,proposals_sent,clients_closed,revenue_closed,notes
+2024-01-01,cold_outreach,0,0,0,0%,0,0,0,0,$0,Initial setup - no emails sent yet
