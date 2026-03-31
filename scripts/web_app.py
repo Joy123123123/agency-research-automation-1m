@@ -87,6 +87,7 @@ TRACKING_DIR = BASE_DIR / "tracking"
 PROGRESS_FILE = TRACKING_DIR / "app_progress.json"
 LEADS_FILE = TRACKING_DIR / "leads.csv"
 REPORTS_DIR = BASE_DIR / "data" / "reports"
+API_KEYS_FILE = BASE_DIR / "config" / "api_keys.env"
 
 TRACKING_DIR.mkdir(parents=True, exist_ok=True)
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -121,6 +122,16 @@ def get_ai() -> "AgencyAI | None":
         if sid not in _ai_instances:
             _ai_instances[sid] = AgencyAI(BASE_DIR)
         return _ai_instances[sid]
+
+
+def api_status() -> dict[str, Any]:
+    """Return which API keys are configured (True/False per key)."""
+    return {
+        "google": bool(os.environ.get("GOOGLE_API_KEY")),
+        "sendgrid": bool(os.environ.get("SENDGRID_API_KEY")),
+        "openai": bool(os.environ.get("OPENAI_API_KEY")),
+        "demo_mode": not bool(os.environ.get("GOOGLE_API_KEY")),
+    }
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -949,6 +960,7 @@ def home() -> str:
     leads = load_leads()
     stats = lead_stats(leads)
     pending = pending_today()
+    api = api_status()
 
     total_tasks = sum(len(s["tasks"]) for s in SECTIONS)
     done_tasks = sum(1 for t in all_tasks() if is_done(t["id"], t["freq"]))
@@ -958,6 +970,29 @@ def home() -> str:
     task_done_map = {t["id"]: is_done(t["id"], t["freq"]) for t in all_tasks()}
 
     tpl = """
+{% if demo_mode %}
+<div style="background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.4);
+  border-radius:10px;padding:12px 15px;margin-bottom:12px;">
+  <div style="font-weight:700;font-size:.88rem;color:var(--accent);">
+    ℹ️ DEMO MODE — সিস্টেম কাজ করছে!
+  </div>
+  <div style="font-size:.78rem;color:var(--muted);margin-top:4px;">
+    Google API key নেই — Research করলে realistic sample leads তৈরি হবে।
+    Real data পেতে:
+    <a href="/setup" style="color:var(--accent);font-weight:600;">⚙️ Setup Guide দেখো</a>
+  </div>
+  <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+    <a href="/research" style="background:var(--accent);color:#fff;border-radius:8px;
+      padding:6px 12px;font-size:.78rem;font-weight:700;text-decoration:none;">
+      🔍 Research শুরু করো (Demo)
+    </a>
+    <a href="/setup" style="background:rgba(79,142,247,.2);color:var(--accent);border-radius:8px;
+      padding:6px 12px;font-size:.78rem;font-weight:600;text-decoration:none;">
+      ⚙️ API Keys Setup
+    </a>
+  </div>
+</div>
+{% endif %}
 {% if pending_count > 0 %}
 <div class="reminder-box">
   <i class="fas fa-bell" style="color:var(--warn)"></i>
@@ -1094,8 +1129,172 @@ def home() -> str:
         overall_pct=overall_pct,
         sec_progress=sec_progress_map,
         task_done=task_done_map,
+        demo_mode=api["demo_mode"],
     )
     return page(content, "home")
+
+
+@app.route("/setup")
+def setup_page() -> str:
+    """Setup guide page — shows API key status and step-by-step instructions."""
+    api = api_status()
+
+    def status_icon(ok: bool) -> str:
+        return "✅" if ok else "❌"
+
+    google_ok = api["google"]
+    sendgrid_ok = api["sendgrid"]
+    openai_ok = api["openai"]
+
+    tpl = f"""
+<div class="page">
+<a href="/" style="font-size:.83rem;color:var(--muted)">
+  <i class="fas fa-arrow-left"></i> Dashboard
+</a>
+
+<div class="page-title" style="margin-top:14px;">⚙️ Setup & API Keys</div>
+
+<!-- Status overview -->
+<div class="card">
+  <div class="card-header"><strong>📊 বর্তমান Status</strong></div>
+  <div class="card-body">
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:600;font-size:.88rem;">🔍 Google Maps API</div>
+          <div style="font-size:.72rem;color:var(--muted);">Lead research (live data)</div>
+        </div>
+        <span style="font-size:1.1rem;">{"✅ সেট" if google_ok else "❌ নেই (Demo mode)"}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:600;font-size:.88rem;">📧 SendGrid API</div>
+          <div style="font-size:.72rem;color:var(--muted);">Email outreach</div>
+        </div>
+        <span style="font-size:1.1rem;">{"✅ সেট" if sendgrid_ok else "❌ নেই (Email disabled)"}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:600;font-size:.88rem;">🤖 OpenAI API</div>
+          <div style="font-size:.72rem;color:var(--muted);">AI content (optional)</div>
+        </div>
+        <span style="font-size:1.1rem;">{"✅ সেট" if openai_ok else "⚠️ নেই (built-in AI চলছে)"}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 1: Create env file -->
+<div class="card">
+  <div class="card-header">
+    <strong>ধাপ ১ — config/api_keys.env ফাইল তৈরি করো</strong>
+  </div>
+  <div class="card-body">
+    <div class="guide-box">Terminal-এ এই কমান্ড দাও:
+
+  cp config/api_keys.env.example config/api_keys.env
+
+তারপর ফাইলটা খোলো:
+  nano config/api_keys.env  ← Linux/Mac/Termux
+  notepad config\\api_keys.env  ← Windows</div>
+  </div>
+</div>
+
+<!-- Step 2: Google API -->
+<div class="card">
+  <div class="card-header">
+    <strong>ধাপ ২ — Google Maps API Key (সবচেয়ে জরুরি)</strong>
+    <span style="font-size:1rem;">{"✅" if google_ok else "❌"}</span>
+  </div>
+  <div class="card-body">
+    <div class="guide-box">১. console.cloud.google.com এ যাও
+২. New Project তৈরি করো (free)
+৩. "Places API" enable করো
+৪. Credentials → "Create API Key"
+৫. api_keys.env ফাইলে:
+
+   GOOGLE_API_KEY=AIza...তোমার key...
+
+Free quota: 200 leads/day বিনামূল্যে
+($200 credit/month — মোটামুটি 40,000 requests)</div>
+    <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com"
+       target="_blank"
+       style="display:block;margin-top:10px;background:#4285F4;color:#fff;text-align:center;
+              border-radius:8px;padding:10px;font-weight:700;font-size:.86rem;text-decoration:none;">
+      🔗 Google Console খোলো
+    </a>
+  </div>
+</div>
+
+<!-- Step 3: SendGrid -->
+<div class="card">
+  <div class="card-header">
+    <strong>ধাপ ৩ — SendGrid API Key (email পাঠাতে)</strong>
+    <span style="font-size:1rem;">{"✅" if sendgrid_ok else "❌"}</span>
+  </div>
+  <div class="card-body">
+    <div class="guide-box">১. sendgrid.com এ free account খোলো
+২. Settings → API Keys → Create API Key
+৩. "Full Access" দাও
+৪. api_keys.env ফাইলে:
+
+   SENDGRID_API_KEY=SG.xxx...তোমার key...
+   SENDGRID_FROM_EMAIL=তোমার@email.com
+   SENDGRID_FROM_NAME=তোমার নাম
+
+Free quota: 100 emails/day বিনামূল্যে</div>
+    <a href="https://app.sendgrid.com/settings/api_keys"
+       target="_blank"
+       style="display:block;margin-top:10px;background:#1A82E2;color:#fff;text-align:center;
+              border-radius:8px;padding:10px;font-weight:700;font-size:.86rem;text-decoration:none;">
+      🔗 SendGrid API Keys খোলো
+    </a>
+  </div>
+</div>
+
+<!-- Step 4: Restart -->
+<div class="card">
+  <div class="card-header"><strong>ধাপ ৪ — App Restart করো</strong></div>
+  <div class="card-body">
+    <div class="guide-box">api_keys.env সেভ করার পর:
+
+  Ctrl+C দিয়ে app বন্ধ করো
+  তারপর আবার চালু করো:
+    python scripts/web_app.py
+
+এরপর Dashboard-এ ✅ দেখাবে।</div>
+  </div>
+</div>
+
+<!-- Demo mode info -->
+<div class="card" style="border-color:rgba(79,142,247,.4);">
+  <div class="card-header" style="background:rgba(79,142,247,.08);">
+    <strong>ℹ️ API key ছাড়াও কাজ করবে?</strong>
+  </div>
+  <div class="card-body">
+    <div style="font-size:.85rem;line-height:1.7;">
+      <strong>হ্যাঁ!</strong> Google API key ছাড়াও Research কাজ করবে —
+      realistic sample US business leads তৈরি হবে।<br><br>
+      <strong>Demo mode-এ যা কাজ করে:</strong><br>
+      ✅ Research (sample leads)<br>
+      ✅ Lead scoring &amp; grading<br>
+      ✅ Leads দেখা ও filter করা<br>
+      ✅ Reports তৈরি করা<br>
+      ✅ AI Assistant (built-in)<br>
+      ✅ Scheduler (auto-run daily)<br>
+      ❌ Live Google Maps data (API key লাগবে)<br>
+      ❌ Email পাঠানো (SendGrid key লাগবে)
+    </div>
+  </div>
+</div>
+
+<a href="/research" class="btn btn-primary w-100" style="margin-top:4px;display:block;
+  text-align:center;text-decoration:none;padding:13px;">
+  🔍 এখনই Research শুরু করো (Demo চলবে)
+</a>
+</div>
+"""
+    return page(tpl, "home")
 
 
 @app.route("/task/<task_id>")
@@ -1610,6 +1809,18 @@ def api_mark_undone(task_id: str) -> Response:
 def api_progress() -> Response:
     """Return current progress as JSON."""
     return jsonify(load_progress())
+
+
+@app.route("/api/status")
+def api_system_status() -> Response:
+    """Return API key status and system info as JSON."""
+    leads = load_leads()
+    stats = lead_stats(leads)
+    return jsonify({
+        "api_keys": api_status(),
+        "leads": stats,
+        "app": "running",
+    })
 
 
 @app.route("/api/leads")
