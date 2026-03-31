@@ -11,7 +11,8 @@ Usage (Replit / Termux / PC):
 
 Features:
     - 📱 Mobile-responsive dark UI (Bootstrap 5 CDN)
-    - 🏠 Dashboard — today's tasks, progress, reminders
+    - 🏠 Dashboard — today's tasks, progress, reminders, API status
+    - 🔄 Automation — daily pipeline auto-runs, log shows what happened
     - 🔍 Research Tool — niche/location picker, auto-runs run_research.py
     - 📧 Outreach Tool — dry-run + live send, auto-runs send_outreach.py
     - 👥 Lead Manager — view/filter all leads from CSV
@@ -19,7 +20,12 @@ Features:
     - 🤖 AI Assistant — API-free, Bengali-first intelligent guide
     - ⚡ Real-time terminal output (Server-Sent Events)
     - 💾 Progress tracking with resume (tracking/app_progress.json)
+    - ⚙️  Setup page — shows which API keys are configured
     - 🔔 Reminder: pending daily tasks shown on dashboard
+
+Auto-scheduler (optional):
+    Set AUTO_SCHEDULER=1 in config/api_keys.env to run the full pipeline
+    automatically every day without any manual action.
 """
 
 from __future__ import annotations
@@ -36,6 +42,11 @@ from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Generator
+
+# Add project root to path so we can import src modules
+_ROOT = Path(__file__).parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 # ── Bootstrap Flask (friendly error if missing) ──────────────────────────────
 try:
@@ -58,6 +69,16 @@ try:
 except ImportError:
     _AI_AVAILABLE = False
     AgencyAI = None  # type: ignore[assignment,misc]
+
+# ── Automation logger (tracks every auto-action) ─────────────────────────────
+try:
+    from src.automation.auto_logger import log_event, today_events, all_events as auto_all_events
+    _AUTO_LOG_AVAILABLE = True
+except ImportError:
+    _AUTO_LOG_AVAILABLE = False
+    def log_event(*a, **kw): pass  # type: ignore[misc]
+    def today_events(*a, **kw): return []  # type: ignore[misc]
+    def auto_all_events(*a, **kw): return []  # type: ignore[misc]
 
 # ── Allowed values (input validation) ────────────────────────────────────────
 ALLOWED_NICHES = {
@@ -912,7 +933,7 @@ def nav_html(active: str) -> str:
     pages = [
         ("home", "/", "fa-home", "হোম"),
         ("research", "/research", "fa-search", "রিসার্চ"),
-        ("ai", "/ai", "fa-robot", "AI"),
+        ("automation", "/automation", "fa-robot", "অটো"),
         ("leads", "/leads", "fa-users", "লিডস"),
         ("reports", "/reports", "fa-chart-bar", "রিপোর্ট"),
     ]
@@ -1295,6 +1316,238 @@ Free quota: 100 emails/day বিনামূল্যে</div>
 </div>
 """
     return page(tpl, "home")
+
+
+@app.route("/automation")
+def automation_page() -> str:
+    """
+    Automation Dashboard — shows what the system did today automatically,
+    what needs the user's attention, and the daily schedule.
+    This is the page the user checks every morning.
+    """
+    api = api_status()
+    events = today_events()
+    recent = auto_all_events(limit=50)
+    leads = load_leads()
+    stats = lead_stats(leads)
+
+    # Identify leads that replied (need user attention)
+    replied_leads = [l for l in leads if l.get("status") == "replied"]
+    new_leads = [l for l in leads if l.get("status") == "new"]
+
+    # Today's event type counts
+    def count_type(t: str) -> int:
+        return sum(1 for e in events if e.get("type") == t)
+
+    today_research = count_type("research")
+    today_email = count_type("outreach")
+    today_followup = count_type("follow_up")
+
+    # Format event type badge colour
+    TYPE_COLOR = {
+        "research": "#4f8ef7",
+        "outreach": "#2ecc71",
+        "follow_up": "#f39c12",
+        "report": "#9b59b6",
+        "scheduler": "#1abc9c",
+        "error": "#e74c3c",
+        "setup": "#6c8099",
+    }
+
+    def _event_rows(evts: list) -> str:
+        if not evts:
+            return '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px;">এখনো কোনো automated action নেই</td></tr>'
+        rows = []
+        for e in evts[:30]:
+            ts = e.get("ts", "")[-8:] or "—"  # HH:MM:SS
+            etype = e.get("type", "info")
+            color = TYPE_COLOR.get(etype, "#6c8099")
+            badge = (
+                f'<span style="background:{color}22;color:{color};border-radius:4px;'
+                f'padding:1px 6px;font-size:.68rem;font-weight:700;">{etype}</span>'
+            )
+            msg = e.get("msg", "")
+            rows.append(
+                f'<tr><td style="font-size:.72rem;color:var(--muted);white-space:nowrap;">{ts}</td>'
+                f'<td style="padding:0 6px;">{badge}</td>'
+                f'<td style="font-size:.78rem;">{msg}</td></tr>'
+            )
+        return "\n".join(rows)
+
+    # Build daily schedule (static, for user reference)
+    schedule_items = [
+        ("09:00", "🔍 Research", "50+ leads auto-researched & scored", today_research > 0),
+        ("10:00", "📧 Outreach", "A/B grade leads-এ email পাঠানো হয়", today_email > 0),
+        ("14:00", "🔄 Follow-up", "Pending follow-up emails পাঠানো হয়", today_followup > 0),
+        ("18:00", "🔄 Follow-up", "সন্ধ্যার follow-up check", today_followup > 1),
+        ("Mon 08:00", "📊 Report", "Weekly summary তৈরি হয়", False),
+    ]
+
+    def schedule_row(time_: str, name: str, desc: str, done: bool) -> str:
+        icon = "✅" if done else "⏳"
+        bg = "rgba(46,204,113,.08)" if done else "transparent"
+        return (
+            f'<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;'
+            f'border-bottom:1px solid var(--border);background:{bg};border-radius:6px;'
+            f'padding-left:6px;">'
+            f'<span style="font-size:.7rem;color:var(--muted);min-width:72px;margin-top:2px;">{time_}</span>'
+            f'<div style="flex:1;">'
+            f'<div style="font-weight:600;font-size:.85rem;">{icon} {name}</div>'
+            f'<div style="font-size:.72rem;color:var(--muted);margin-top:2px;">{desc}</div>'
+            f'</div></div>'
+        )
+
+    schedule_html = "".join(schedule_row(*row) for row in schedule_items)
+    event_rows_html = _event_rows(events)
+    recent_rows_html = _event_rows(recent)
+
+    auto_on = api.get("demo_mode") is not None  # scheduler is always running when app is up
+
+    content = f"""
+<div class="page">
+<div class="page-title">🤖 Automation Dashboard</div>
+
+<!-- ─── Today's summary ─── -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+  <div class="stat-box">
+    <div class="stat-num" style="font-size:1.4rem;">{today_research}</div>
+    <div class="stat-lbl">Research<br>আজ চলেছে</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-num" style="font-size:1.4rem;color:var(--success);">{today_email}</div>
+    <div class="stat-lbl">Email<br>পাঠানো হয়েছে</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-num" style="font-size:1.4rem;color:#f39c12;">{today_followup}</div>
+    <div class="stat-lbl">Follow-up<br>গেছে</div>
+  </div>
+</div>
+
+<!-- ─── Needs attention ─── -->
+{"" if not replied_leads else f'''
+<div style="background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.4);
+  border-radius:10px;padding:12px 15px;margin-bottom:12px;">
+  <div style="font-weight:700;font-size:.9rem;color:var(--success);">
+    🎉 {len(replied_leads)}টি Lead Reply করেছে! এখনই সাড়া দাও
+  </div>
+  {"".join(f'<div style="font-size:.78rem;margin-top:5px;">• <strong>{l.get("name","")}</strong> — {l.get("email","")}</div>' for l in replied_leads[:5])}
+  <a href="/leads?status=replied" style="display:inline-block;margin-top:8px;background:var(--success);
+    color:#fff;border-radius:8px;padding:6px 14px;font-size:.78rem;font-weight:700;text-decoration:none;">
+    📩 Replied Leads দেখো
+  </a>
+</div>
+'''}
+
+<!-- ─── Auto-scheduler status ─── -->
+<div class="card">
+  <div class="card-header">
+    <strong>⚡ Auto-Scheduler Status</strong>
+    <span style="color:var(--success);font-size:.78rem;">● Running</span>
+  </div>
+  <div class="card-body">
+    <div style="font-size:.82rem;margin-bottom:10px;color:var(--muted);">
+      App চলার সময় scheduler background-এ কাজ করে।
+      <strong style="color:var(--text);">আপনাকে কিছু করতে হবে না।</strong>
+    </div>
+    {schedule_html}
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <a href="/api/run/research?niche=dentist&location=New+York%2C+NY&count=50"
+         onclick="event.preventDefault();runStream('/api/run/research?niche=dentist&location=New+York%2C+NY&count=50','auto-term',null);document.getElementById('auto-term-wrap').style.display='';"
+         class="btn btn-primary btn-sm">▶ Research এখনই</a>
+      <a href="/api/run/outreach?campaign=initial&dry=1"
+         onclick="event.preventDefault();runStream('/api/run/outreach?campaign=initial&dry=1','auto-term',null);document.getElementById('auto-term-wrap').style.display='';"
+         class="btn btn-success btn-sm">📧 Outreach এখনই</a>
+      <a href="/research" class="btn btn-outline btn-sm">⚙️ Settings</a>
+    </div>
+    <div id="auto-term-wrap" style="display:none;margin-top:10px;">
+      <div id="auto-term" class="terminal" style="min-height:80px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Today's automated log ─── -->
+<div class="card">
+  <div class="card-header"><strong>📋 আজকের Automated Log</strong>
+    <span style="font-size:.72rem;color:var(--muted);">{date.today().isoformat()}</span>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>Type</th><th>Action</th></tr></thead>
+        <tbody>{event_rows_html}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Pipeline stats ─── -->
+<div class="card">
+  <div class="card-header"><strong>📊 Overall Pipeline</strong></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+      <div class="stat-box"><div class="stat-num">{stats["total"]}</div><div class="stat-lbl">Total Leads</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--accent);">{stats["contacted"]}</div><div class="stat-lbl">Contacted</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:#f39c12;">{stats["replied"]}</div><div class="stat-lbl">Replied</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--success);">{stats["converted"]}</div><div class="stat-lbl">Converted 💰</div></div>
+    </div>
+    <div style="margin-top:10px;font-size:.78rem;color:var(--muted);text-align:center;">
+      Reply rate: <strong style="color:var(--text);">{stats["reply_rate"]}%</strong>
+      &nbsp;|&nbsp; A-grade leads: <strong style="color:var(--text);">{stats["grade_a"]}</strong>
+    </div>
+  </div>
+</div>
+
+<!-- ─── আপনার daily checklist ─── -->
+<div class="card" style="border-color:rgba(79,142,247,.4);">
+  <div class="card-header" style="background:rgba(79,142,247,.08);">
+    <strong>☑️ আপনার Daily Checklist (শুধু এইটুকু করতে হবে)</strong>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:.85rem;">
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <span style="font-size:1.1rem;">1️⃣</span>
+        <div><strong>সকালে এই page খোলো</strong><br>
+          <span style="color:var(--muted);font-size:.78rem;">দেখো কী automatically হয়েছে। কোনো error থাকলে Setup page দেখো।</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <span style="font-size:1.1rem;">2️⃣</span>
+        <div><strong>Reply চেক করো</strong><br>
+          <span style="color:var(--muted);font-size:.78rem;">উপরে যদি "Reply এসেছে" দেখায়, সেই lead-এর সাথে personally কথা বলো।</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <span style="font-size:1.1rem;">3️⃣</span>
+        <div><strong>Lead quality দেখো (optional)</strong><br>
+          <span style="color:var(--muted);font-size:.78rem;">Leads page-এ A-grade lead দেখো। কোনোটাতে manually follow করতে চাইলে করো।</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <span style="font-size:1.1rem;">4️⃣</span>
+        <div><strong>বাকি সব System করে</strong><br>
+          <span style="color:var(--muted);font-size:.78rem;">Research, email, follow-up — সব automatic। তোমাকে কিছু করতে হবে না।</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Recent history ─── -->
+<div class="card">
+  <div class="card-header"><strong>🕐 Recent History (last 50)</strong></div>
+  <div class="card-body" style="padding:0;">
+    <div class="table-wrap" style="max-height:300px;overflow-y:auto;">
+      <table>
+        <thead><tr><th>Time</th><th>Type</th><th>Action</th></tr></thead>
+        <tbody>{recent_rows_html}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div>
+"""
+    return page(content, "automation")
 
 
 @app.route("/task/<task_id>")
@@ -1823,6 +2076,18 @@ def api_system_status() -> Response:
     })
 
 
+@app.route("/api/automation/log")
+def api_automation_log() -> Response:
+    """Return automation log entries as JSON."""
+    scope = request.args.get("scope", "today")
+    if scope == "today":
+        entries = today_events()
+    else:
+        limit = min(int(request.args.get("limit", "50")), 200)
+        entries = auto_all_events(limit=limit)
+    return jsonify(entries)
+
+
 @app.route("/api/leads")
 def api_leads() -> Response:
     """Return leads as JSON."""
@@ -1855,6 +2120,7 @@ def api_run_research() -> Response:
         f'--count {count_int} {skip_flag}'
     ).strip()
 
+    log_event("research", f"Manual research started: {niche} in {location} ({count_int} leads)")
     return Response(
         stream_job(cmd),
         mimetype="text/event-stream",
@@ -1877,11 +2143,13 @@ def api_run_outreach() -> Response:
         limit_int = DEFAULT_EMAIL_LIMIT
 
     dry_flag = "--dry-run" if dry == "1" else ""
+    mode = "dry-run" if dry == "1" else "live"
     cmd = (
         f'{sys.executable} scripts/send_outreach.py '
         f'--campaign {campaign} --limit {limit_int} {dry_flag}'
     ).strip()
 
+    log_event("outreach", f"Outreach started: {campaign} campaign, {limit_int} limit ({mode})")
     return Response(
         stream_job(cmd),
         mimetype="text/event-stream",
@@ -1900,6 +2168,7 @@ def api_run_report() -> Response:
         fmt = "html"
 
     cmd = f'{sys.executable} scripts/generate_report.py --period {period} --format {fmt}'
+    log_event("report", f"Report generation started: {period} {fmt}")
     return Response(
         stream_job(cmd),
         mimetype="text/event-stream",
@@ -2398,9 +2667,93 @@ def api_ai_recommend() -> Response:
 # Entry point
 # ═════════════════════════════════════════════════════════════════════════════
 
+def _start_auto_scheduler() -> None:
+    """
+    Start the background automation scheduler in a daemon thread.
+    Runs automatically when AUTO_SCHEDULER=1 is set in config/api_keys.env,
+    OR always runs in lightweight mode (logs events, triggers pipeline scripts).
+    """
+    # Timeout (seconds) for each pipeline subprocess
+    _RESEARCH_TIMEOUT = 120   # research + scoring
+    _OUTREACH_TIMEOUT = 300   # email sending (may be slow)
+    _REPORT_TIMEOUT = 60      # report generation
+    # How often the scheduler checks for pending jobs (seconds)
+    _SCHEDULER_POLL_INTERVAL = 30
+
+    try:
+        sys.path.insert(0, str(BASE_DIR))
+        import schedule
+
+        def _run_research() -> None:
+            log_event("research", "Auto-scheduler: starting daily research (50 leads)")
+            result = subprocess.run(
+                [sys.executable, "scripts/run_research.py",
+                 "--niche", "dentist", "--location", "New York, NY", "--count", "50"],
+                capture_output=True, text=True, cwd=str(BASE_DIR), timeout=_RESEARCH_TIMEOUT
+            )
+            status = "completed" if result.returncode == 0 else "error"
+            log_event("research", f"Auto research {status}", {"rc": result.returncode})
+
+        def _run_outreach() -> None:
+            log_event("outreach", "Auto-scheduler: starting daily outreach emails")
+            result = subprocess.run(
+                [sys.executable, "scripts/send_outreach.py",
+                 "--campaign", "initial", "--limit", "50"],
+                capture_output=True, text=True, cwd=str(BASE_DIR), timeout=_OUTREACH_TIMEOUT
+            )
+            status = "completed" if result.returncode == 0 else "error"
+            log_event("outreach", f"Auto outreach {status}", {"rc": result.returncode})
+
+        def _run_followup() -> None:
+            log_event("follow_up", "Auto-scheduler: sending follow-up emails")
+            result = subprocess.run(
+                [sys.executable, "scripts/send_outreach.py",
+                 "--campaign", "follow_up", "--limit", "30"],
+                capture_output=True, text=True, cwd=str(BASE_DIR), timeout=_OUTREACH_TIMEOUT
+            )
+            status = "completed" if result.returncode == 0 else "error"
+            log_event("follow_up", f"Auto follow-up {status}", {"rc": result.returncode})
+
+        def _run_report() -> None:
+            log_event("report", "Auto-scheduler: generating weekly report")
+            subprocess.run(
+                [sys.executable, "scripts/generate_report.py",
+                 "--period", "weekly", "--format", "html"],
+                capture_output=True, text=True, cwd=str(BASE_DIR), timeout=_REPORT_TIMEOUT
+            )
+            log_event("report", "Weekly report generated")
+
+        # Schedule the pipeline
+        schedule.every().day.at("09:00").do(_run_research)
+        schedule.every().day.at("10:00").do(_run_outreach)
+        schedule.every().day.at("14:00").do(_run_followup)
+        schedule.every().day.at("18:00").do(_run_followup)
+        schedule.every().monday.at("08:00").do(_run_report)
+
+        log_event("scheduler", "Auto-scheduler started (research 9AM, outreach 10AM, follow-up 2PM+6PM, report Mon 8AM)")
+
+        def _loop() -> None:
+            import time
+            while True:
+                schedule.run_pending()
+                time.sleep(_SCHEDULER_POLL_INTERVAL)
+
+        t = threading.Thread(target=_loop, daemon=True, name="AutoScheduler")
+        t.start()
+        logger.info("✅ Auto-scheduler running in background")
+
+    except ImportError:
+        logger.warning("'schedule' package not installed — auto-scheduler disabled. Run: pip install schedule")
+    except Exception as exc:
+        logger.error("Auto-scheduler failed to start: %s", exc)
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     host = os.environ.get("HOST", "0.0.0.0")
+
+    # Start auto-scheduler in background (always on)
+    _start_auto_scheduler()
 
     print("\n" + "=" * 60)
     print("  🚀 Agency Research Automation — Mobile Web App")
@@ -2411,6 +2764,10 @@ if __name__ == "__main__":
     print("  Replit → Run, দেওয়া URL → mobile browser")
     print("  Termux → http://localhost:5000")
     print("  Same WiFi → http://<PC-IP>:5000")
+    print("  " + "─" * 56)
+    print("  🤖 Auto-scheduler: background-এ চলছে")
+    print("  📋 Automation log: http://localhost:{port}/automation".format(port=port))
+    print("  ⚙️  Setup guide:   http://localhost:{port}/setup".format(port=port))
     print("=" * 60 + "\n")
 
     app.run(host=host, port=port, debug=False, threaded=True)

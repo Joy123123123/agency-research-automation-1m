@@ -297,7 +297,14 @@ class AgencyFinder:
         Produces deterministic results for the same niche+location pair so that
         repeated runs don't create duplicate entries with different names.
         """
-        rng = random.Random(seed if seed is not None else hash(f"{niche}:{location}") & 0xFFFFFF)
+        # Mask the Python hash to 24 bits to get a stable, non-negative seed value
+        # that fits within random.seed()'s reliable integer range across platforms.
+        _SEED_BITS = 0xFFFFFF
+        # Allow cycling through the name pool with numeric suffixes to generate
+        # more unique names than the pool size when max_results > pool size.
+        _POOL_CYCLES = 2
+
+        rng = random.Random(seed if seed is not None else hash(f"{niche}:{location}") & _SEED_BITS)
 
         name_pool = list(self._DEMO_NAME_PARTS.get(niche, self._DEMO_NAME_PARTS["restaurant"]))
         city, state = self._LOCATION_CITY_STATE.get(location, ("", ""))
@@ -315,7 +322,7 @@ class AgencyFinder:
         agencies: List[Agency] = []
         used_names: set = set()
 
-        for i in range(min(max_results, len(name_pool) * 2)):
+        for i in range(min(max_results, len(name_pool) * _POOL_CYCLES)):
             # Cycle through name pool with numeric suffix when exhausted
             base_name = name_pool[i % len(name_pool)]
             suffix = f" #{i // len(name_pool) + 1}" if i >= len(name_pool) else ""
@@ -336,10 +343,15 @@ class AgencyFinder:
                 rng.randint(25, 80),  # medium
                 rng.randint(80, 300), # established
             ])
-            has_website = rng.random() < 0.45   # 45% have a website
-            has_social = rng.random() < 0.35    # 35% have social media
-            has_email = rng.random() < 0.30     # 30% have findable email
-            has_phone = rng.random() < 0.75     # 75% have phone listed
+            # Realistic US small-business data coverage probabilities
+            _P_WEBSITE = 0.45   # 45% have a website
+            _P_SOCIAL = 0.35    # 35% have social media
+            _P_EMAIL = 0.30     # 30% have a findable email address
+            _P_PHONE = 0.75     # 75% have a phone number listed
+            has_website = rng.random() < _P_WEBSITE
+            has_social = rng.random() < _P_SOCIAL
+            has_email = rng.random() < _P_EMAIL
+            has_phone = rng.random() < _P_PHONE
 
             slug = name.lower().replace(" ", "").replace("&", "and")[:20]
             website = f"https://www.{slug}.com" if has_website else None
