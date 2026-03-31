@@ -115,27 +115,26 @@ class AgencyFinder:
         niche: str,
         location: str,
         max_results: int = 20,
-        base_url: str = "https://www.yellowpages.com.bd/search"
+        base_url: str = "https://www.yellowpages.com/search"
     ) -> List[Agency]:
-        """Fallback method using public business directories."""
+        """Fallback method using US Yellow Pages directory."""
         agencies = []
         logger.info(f"Using fallback search for '{niche}' in '{location}'")
 
         # Build URL safely (encode niche/location for URL safety)
-        from urllib.parse import quote
-        niche_enc = quote(niche.strip(), safe="")
-        location_enc = quote(location.strip(), safe="")
-        url = f"{base_url.rstrip('/')}/{niche_enc}/{location_enc}"
+        from urllib.parse import quote, urlencode
+        params = urlencode({"search_terms": niche.strip(), "geo_location_terms": location.strip()})
+        url = f"{base_url.rstrip('/')}?{params}"
 
         try:
             response = self.session.get(url, timeout=15)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
 
-            for listing in soup.select(".business-listing")[:max_results]:
+            for listing in soup.select(".result")[:max_results]:
                 name_el = listing.select_one(".business-name")
-                phone_el = listing.select_one(".business-phone")
-                address_el = listing.select_one(".business-address")
+                phone_el = listing.select_one(".phones")
+                address_el = listing.select_one(".adr")
 
                 if name_el:
                     agency = Agency(

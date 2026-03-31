@@ -30,8 +30,8 @@ NOTION_TOKEN=your_notion_token_here
 ## ৩. প্রথম রিসার্চ রান করুন (Run First Research)
 
 ```bash
-# টার্গেট নিশ রিসার্চ করুন
-python scripts/run_research.py --niche "restaurant" --location "Dhaka" --count 50
+# টার্গেট নিশ রিসার্চ করুন (US মার্কেট)
+python scripts/run_research.py --niche "restaurant" --location "New York, NY" --count 50
 
 # ইমেইল আউটরিচ পাঠান
 python scripts/send_outreach.py --campaign "initial" --leads tracking/leads.csv

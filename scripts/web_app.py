@@ -65,8 +65,9 @@ ALLOWED_NICHES = {
     "salon", "hotel", "pharmacy", "plumber", "electrician",
 }
 ALLOWED_LOCATIONS = {
-    "Dhaka", "Chittagong", "Sylhet", "Rajshahi", "Khulna",
-    "Comilla", "Mymensingh",
+    "New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX",
+    "Phoenix, AZ", "Philadelphia, PA", "San Antonio, TX", "San Diego, CA",
+    "Dallas, TX", "Miami, FL",
 }
 ALLOWED_CAMPAIGNS = {"initial", "follow_up"}
 ALLOWED_PERIODS = {"weekly", "monthly"}
@@ -1200,15 +1201,18 @@ def research() -> str:
       <option value="electrician">⚡ Electrician</option>
     </select>
 
-    <label class="form-lbl">Location (কোথায়?)</label>
+    <label class="form-lbl">Location (কোথায়? — US মার্কেট)</label>
     <select class="form-sel" id="location">
-      <option value="Dhaka">Dhaka</option>
-      <option value="Chittagong">Chittagong</option>
-      <option value="Sylhet">Sylhet</option>
-      <option value="Rajshahi">Rajshahi</option>
-      <option value="Khulna">Khulna</option>
-      <option value="Comilla">Comilla</option>
-      <option value="Mymensingh">Mymensingh</option>
+      <option value="New York, NY">New York, NY</option>
+      <option value="Los Angeles, CA">Los Angeles, CA</option>
+      <option value="Chicago, IL">Chicago, IL</option>
+      <option value="Houston, TX">Houston, TX</option>
+      <option value="Phoenix, AZ">Phoenix, AZ</option>
+      <option value="Philadelphia, PA">Philadelphia, PA</option>
+      <option value="San Antonio, TX">San Antonio, TX</option>
+      <option value="San Diego, CA">San Diego, CA</option>
+      <option value="Dallas, TX">Dallas, TX</option>
+      <option value="Miami, FL">Miami, FL</option>
     </select>
 
     <label class="form-lbl">কতটি লিড খুঁজবে?</label>
@@ -1245,10 +1249,10 @@ def research() -> str:
   <div class="card-body">
     <div class="guide-box">Google API Key না থাকলে "Skip scraping" চালু করো।
 
-ভালো niche:
-• Restaurant — সহজে convert হয়
-• Dentist — high value, SEO
-• Lawyer — premium pricing
+US মার্কেট — ভালো niche:
+• Dentist (New York, LA) — high value, SEO ($2,500+/deal)
+• Lawyer (Chicago, Dallas) — premium pricing ($3,500+/deal)
+• Restaurant (Miami, Houston) — সহজে convert হয় ($1,500/deal)
 
 প্রতিদিন ৫০+ লিড research করো।
 Save হয়: tracking/leads.csv</div>
@@ -1618,7 +1622,7 @@ def api_leads() -> Response:
 def api_run_research() -> Response:
     """SSE stream: run the research script."""
     niche = request.args.get("niche", "restaurant")
-    location = request.args.get("location", "Dhaka")
+    location = request.args.get("location", "New York, NY")
     count = request.args.get("count", str(DEFAULT_LEAD_COUNT))
     skip = request.args.get("skip", "0")
 
@@ -1626,7 +1630,7 @@ def api_run_research() -> Response:
     if niche not in ALLOWED_NICHES:
         niche = "restaurant"
     if location not in ALLOWED_LOCATIONS:
-        location = "Dhaka"
+        location = "New York, NY"
 
     try:
         count_int = max(MIN_LEAD_COUNT, min(MAX_LEAD_COUNT, int(count)))

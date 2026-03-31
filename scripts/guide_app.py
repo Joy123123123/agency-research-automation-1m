@@ -156,18 +156,18 @@ SECTIONS: list[dict[str, Any]] = [
                     "AI দিয়ে score করবে এবং tracking/leads.csv-এ save করবে।\n"
                     "\n"
                     "কমান্ড:\n"
-                    "  python scripts/run_research.py --niche restaurant --location Dhaka --count 50\n"
+                    "  python scripts/run_research.py --niche restaurant --location \"New York, NY\" --count 50\n"
                     "\n"
                     "Niche পরিবর্তন করতে পারো:\n"
                     "  restaurant, dentist, lawyer, real estate, gym, salon, hotel, pharmacy\n"
                     "\n"
-                    "Location:\n"
-                    "  Dhaka, Chittagong, Sylhet, Rajshahi, Khulna\n"
+                    "US Location:\n"
+                    "  \"New York, NY\", \"Los Angeles, CA\", \"Chicago, IL\", \"Houston, TX\", \"Miami, FL\"\n"
                     "\n"
                     "API Key না থাকলে --skip-scrape দিয়ে চালাও:\n"
                     "  python scripts/run_research.py --skip-scrape\n"
                 ),
-                "command": "python scripts/run_research.py --niche restaurant --location Dhaka --count 50",
+                "command": "python scripts/run_research.py --niche restaurant --location \"New York, NY\" --count 50",
             },
             {
                 "id": "morning_review_leads",
@@ -447,7 +447,7 @@ SECTIONS: list[dict[str, Any]] = [
                     "                  gym, salon, plumber, electrician, hotel, pharmacy\n"
                     "\n"
                     "নতুন নিশ research করো:\n"
-                    "  python scripts/run_research.py --niche dentist --location Chittagong --count 30\n"
+                    "  python scripts/run_research.py --niche dentist --location \"Chicago, IL\" --count 30\n"
                     "\n"
                     "কোন niche সবচেয়ে ভালো response দিচ্ছে সেটাতে বেশি focus করো।\n"
                 ),

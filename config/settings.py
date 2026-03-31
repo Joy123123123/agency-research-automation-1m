@@ -84,11 +84,11 @@ DEFAULT_NICHES = [
 ]
 
 DEFAULT_LOCATIONS = [
-    "Dhaka",
-    "Chittagong",
-    "Sylhet",
-    "Rajshahi",
-    "Khulna",
+    "New York, NY",
+    "Los Angeles, CA",
+    "Chicago, IL",
+    "Houston, TX",
+    "Miami, FL",
 ]
 
 

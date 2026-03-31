@@ -2,7 +2,7 @@
 """
 Main Research Runner Script
 Runs agency research for given niche and location
-Usage: python scripts/run_research.py --niche restaurant --location Dhaka --count 50
+Usage: python scripts/run_research.py --niche restaurant --location "New York, NY" --count 50
 Owner: Md Jamil Islam
 """
 import sys
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 def main():
     parser = argparse.ArgumentParser(description="Agency Research Runner")
     parser.add_argument("--niche", default="restaurant", help="Business niche to research")
-    parser.add_argument("--location", default="Dhaka", help="Location to search in")
+    parser.add_argument("--location", default="New York, NY", help="Location to search in")
     parser.add_argument("--count", type=int, default=50, help="Max leads to find")
     parser.add_argument("--skip-scrape", action="store_true", help="Skip website scraping")
     parser.add_argument("--output", default=None, help="Output CSV filename")
