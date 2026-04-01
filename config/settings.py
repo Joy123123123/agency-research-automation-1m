@@ -4,7 +4,12 @@ Owner: Md Jamil Islam
 """
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    def load_dotenv(*_args, **_kwargs):
+        """Fallback when python-dotenv is not installed."""
+        return False
 
 # Load environment variables
 BASE_DIR = Path(__file__).parent.parent
@@ -27,6 +32,15 @@ SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
 SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL", "agency@example.com")
 SENDGRID_FROM_NAME = os.getenv("SENDGRID_FROM_NAME", "Md Jamil Islam")
 EMAIL_DAILY_LIMIT = int(os.getenv("EMAIL_DAILY_LIMIT", "200"))
+
+# Gmail SMTP (free alternative to SendGrid — pure Python, no API key)
+# Get App Password: myaccount.google.com → Security → App Passwords
+GMAIL_EMAIL = os.getenv("GMAIL_EMAIL", "")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
+GMAIL_SENDER_NAME = os.getenv("GMAIL_SENDER_NAME", SENDGRID_FROM_NAME)
+
+# Auto-scheduler: set AUTO_SCHEDULER=1 in api_keys.env to run pipeline automatically
+AUTO_SCHEDULER = os.getenv("AUTO_SCHEDULER", "0") == "1"
 
 
 # ========================
@@ -84,11 +98,11 @@ DEFAULT_NICHES = [
 ]
 
 DEFAULT_LOCATIONS = [
-    "Dhaka",
-    "Chittagong",
-    "Sylhet",
-    "Rajshahi",
-    "Khulna",
+    "New York, NY",
+    "Los Angeles, CA",
+    "Chicago, IL",
+    "Houston, TX",
+    "Miami, FL",
 ]
 
 

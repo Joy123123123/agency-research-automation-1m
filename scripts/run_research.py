@@ -2,7 +2,11 @@
 """
 Main Research Runner Script
 Runs agency research for given niche and location
-Usage: python scripts/run_research.py --niche restaurant --location Dhaka --count 50
+Usage: python scripts/run_research.py --niche restaurant --location "New York, NY" --count 50
+
+API-free demo mode:  No Google API key required — generates realistic sample leads automatically.
+Live mode:           Set GOOGLE_API_KEY in config/api_keys.env to pull real Google Maps data.
+
 Owner: Md Jamil Islam
 """
 import sys
@@ -15,14 +19,12 @@ from datetime import datetime
 # Add parent dir to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.research.agency_finder import AgencyFinder
-from src.research.contact_scraper import ContactScraper
-from src.research.market_analyzer import MarketAnalyzer
-from src.ai.lead_scorer import LeadScorer
 from config.settings import (
     GOOGLE_API_KEY, RESEARCH_DELAY_SECONDS,
     MAX_LEADS_PER_DAY, TRACKING_DIR, LOG_LEVEL
 )
+
+Path("logs").mkdir(exist_ok=True)
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, "INFO"),
@@ -38,20 +40,36 @@ logger = logging.getLogger(__name__)
 def main():
     parser = argparse.ArgumentParser(description="Agency Research Runner")
     parser.add_argument("--niche", default="restaurant", help="Business niche to research")
-    parser.add_argument("--location", default="Dhaka", help="Location to search in")
+    parser.add_argument("--location", default="New York, NY", help="Location to search in")
     parser.add_argument("--count", type=int, default=50, help="Max leads to find")
     parser.add_argument("--skip-scrape", action="store_true", help="Skip website scraping")
     parser.add_argument("--output", default=None, help="Output CSV filename")
     args = parser.parse_args()
 
-    logger.info(f"Starting research: niche='{args.niche}', location='{args.location}', count={args.count}")
+    # Lazy imports so `--help` works even when optional research deps are not installed.
+    from src.research.agency_finder import AgencyFinder
+    from src.research.contact_scraper import ContactScraper
+    from src.research.market_analyzer import MarketAnalyzer
+    from src.ai.lead_scorer import LeadScorer
 
-    # 1. Find agencies
+    demo_mode = not bool(GOOGLE_API_KEY)
+    if demo_mode:
+        print("ℹ️  DEMO MODE — Google API key not set.")
+        print("   Generating realistic sample leads (no live data).")
+        print("   To get live results: add GOOGLE_API_KEY to config/api_keys.env\n")
+
+    logger.info(
+        f"Starting research: niche='{args.niche}', location='{args.location}', "
+        f"count={args.count}, demo_mode={demo_mode}"
+    )
+
+    # 1. Find agencies (demo leads generated automatically when no API key is set)
     finder = AgencyFinder(api_key=GOOGLE_API_KEY, delay=RESEARCH_DELAY_SECONDS)
     agencies = finder.find_by_google_maps(args.niche, args.location, args.count)
 
     if not agencies:
-        logger.warning("No agencies found. Exiting.")
+        logger.warning("No agencies found even after demo fallback. Exiting.")
+        print("❌ No leads found. Check your niche/location arguments.")
         return
 
     # 2. Filter by quality criteria
@@ -65,8 +83,12 @@ def main():
     high_priority = scorer.filter_high_priority(scored_leads)
     logger.info(f"{len(high_priority)} high-priority leads identified")
 
-    # 4. Scrape contact info (optional)
-    if not args.skip_scrape:
+    if not high_priority:
+        logger.info("No high-priority leads after scoring; using all scored leads instead.")
+        high_priority = scored_leads
+
+    # 4. Scrape contact info (skipped in demo mode to avoid hitting live sites)
+    if not args.skip_scrape and not demo_mode:
         scraper = ContactScraper(delay=RESEARCH_DELAY_SECONDS)
         for sl in high_priority:
             website = sl.lead.get("website")
@@ -107,12 +129,15 @@ def main():
         writer.writerows(rows)
 
     logger.info(f"Saved {len(rows)} leads to {output_file}")
-    print(f"\n✅ Research complete!")
+    mode_tag = "[DEMO] " if demo_mode else ""
+    print(f"\n✅ {mode_tag}Research complete!")
     print(f"   Found: {len(agencies)} agencies")
     print(f"   High priority: {len(high_priority)} leads")
     print(f"   Saved to: {output_file}")
     print(f"   Recommended service: {insight.recommended_service}")
     print(f"   Est. monthly revenue: ${insight.estimated_revenue:,.0f}")
+    if demo_mode:
+        print("\n💡 Next step: add GOOGLE_API_KEY to config/api_keys.env for live data.")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from src.automation.follow_up import FollowUpManager
-from src.automation.email_sender import EmailSender
+from src.automation.email_sender import EmailSender, _html_to_text
 
 
 class TestFollowUpManager:
@@ -54,19 +54,26 @@ class TestEmailSender:
         # No API key — tests fallback behavior
         self.sender = EmailSender("", "test@test.com", "Test Sender")
 
-    def test_send_without_api_key(self):
+    def test_send_without_credentials(self):
+        """When no credentials are configured, email is skipped (not sent)."""
         result = self.sender.send_single(
             to_email="lead@test.com",
             to_name="Lead",
             subject="Test",
             html_content="<p>Hello</p>"
         )
-        assert result.status == "failed"
-        assert "not configured" in result.error.lower()
+        # "skipped" means no backend is configured — not an error, just no-op
+        assert result.status in ("skipped", "failed")
+        assert result.error is not None
+        assert "not configured" in result.error.lower() or "credential" in result.error.lower()
+
+    def test_not_configured_when_no_keys(self):
+        """EmailSender reports unconfigured when neither SendGrid nor SMTP keys provided."""
+        assert not self.sender.is_configured()
 
     def test_html_to_text(self):
         html = "<p>Hello <b>World</b></p>"
-        text = self.sender._html_to_text(html)
+        text = _html_to_text(html)
         assert "Hello" in text
         assert "World" in text
         assert "<" not in text

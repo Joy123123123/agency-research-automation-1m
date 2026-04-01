@@ -903,7 +903,7 @@ class AgencyAI:
                 "- ⚖️ **Lawyer** — premium\n"
                 "- 💪 **Gym** — social media দরকার\n\n"
                 "**ধাপ ৩: Location দাও**\n"
-                "শুরু করো: Dhaka বা Chittagong\n\n"
+                "US মার্কেট: New York, NY বা Los Angeles, CA\n\n"
                 "**ধাপ ৪: Count দাও**\n"
                 "প্রতিদিন কমপক্ষে **50 লিড** research করো\n\n"
                 "**ধাপ ৫: Run করো**\n"
@@ -1399,7 +1399,7 @@ class AgencyAI:
                 "তোমার কোনো লিড নেই। প্রথম কাজ:\n"
                 "→ Research Tool খোলো\n"
                 "→ Niche: Restaurant বা Dentist\n"
-                "→ Location: Dhaka\n"
+                "→ Location: New York, NY\n"
                 "→ Count: 50\n"
                 "→ Run করো!"
             )
