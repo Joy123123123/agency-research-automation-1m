@@ -19,14 +19,12 @@ from datetime import datetime
 # Add parent dir to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.research.agency_finder import AgencyFinder
-from src.research.contact_scraper import ContactScraper
-from src.research.market_analyzer import MarketAnalyzer
-from src.ai.lead_scorer import LeadScorer
 from config.settings import (
     GOOGLE_API_KEY, RESEARCH_DELAY_SECONDS,
     MAX_LEADS_PER_DAY, TRACKING_DIR, LOG_LEVEL
 )
+
+Path("logs").mkdir(exist_ok=True)
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, "INFO"),
@@ -47,6 +45,12 @@ def main():
     parser.add_argument("--skip-scrape", action="store_true", help="Skip website scraping")
     parser.add_argument("--output", default=None, help="Output CSV filename")
     args = parser.parse_args()
+
+    # Lazy imports so `--help` works even when optional research deps are not installed.
+    from src.research.agency_finder import AgencyFinder
+    from src.research.contact_scraper import ContactScraper
+    from src.research.market_analyzer import MarketAnalyzer
+    from src.ai.lead_scorer import LeadScorer
 
     demo_mode = not bool(GOOGLE_API_KEY)
     if demo_mode:

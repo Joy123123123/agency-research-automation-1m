@@ -4,7 +4,12 @@ Owner: Md Jamil Islam
 """
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    def load_dotenv(*_args, **_kwargs):
+        """Fallback when python-dotenv is not installed."""
+        return False
 
 # Load environment variables
 BASE_DIR = Path(__file__).parent.parent
