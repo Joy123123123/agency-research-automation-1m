@@ -31,12 +31,12 @@ Termux খুলুন এবং নিচের commands একটা একট
 # Package list update
 pkg update -y && pkg upgrade -y
 
-# Required packages
+# Required packages (python includes pip automatically in Termux)
 pkg install -y python git openssl libffi
-
-# Python pip upgrade
-pip install --upgrade pip
 ```
+
+> ⚠️ **Termux-এ `pip install --upgrade pip` চালাবেন না** — এটা Termux-এর `python-pip` package নষ্ট করে দেয়। `pkg install python` দিলেই pip চলে আসে, আলাদা upgrade দরকার নেই।
+> *(Do NOT run `pip install --upgrade pip` in Termux — it breaks the Termux python-pip package. pip comes bundled with `pkg install python`.)*
 
 ---
 
