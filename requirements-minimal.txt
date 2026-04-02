@@ -1,4 +1,5 @@
-# Minimal requirements — only what web_app.py needs
+# Minimal requirements — web_app.py + free_mode.py (Termux friendly)
 # Install: pip install -r requirements-minimal.txt
 flask>=3.0.0
 requests>=2.31.0
+schedule>=1.2.0

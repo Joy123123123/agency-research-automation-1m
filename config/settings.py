@@ -42,6 +42,12 @@ GMAIL_SENDER_NAME = os.getenv("GMAIL_SENDER_NAME", SENDGRID_FROM_NAME)
 # Auto-scheduler: set AUTO_SCHEDULER=1 in api_keys.env to run pipeline automatically
 AUTO_SCHEDULER = os.getenv("AUTO_SCHEDULER", "0") == "1"
 
+# ========================
+# Telegram (Free Mode notifications)
+# ========================
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
 
 # ========================
 # CRM Configuration

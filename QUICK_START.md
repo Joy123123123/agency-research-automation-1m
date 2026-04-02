@@ -59,6 +59,44 @@ python scripts/scheduler.py --start
 
 ---
 
+## 📱 Free Mode — Android Phone (Termux) — No API Keys Needed!
+
+শুধু **Telegram Bot Token** লাগবে — বাকি সব free!
+
+> Full guide: **[TERMUX_SETUP.md](TERMUX_SETUP.md)**
+
+### Quick steps (Termux):
+
+```bash
+# 1. Termux setup
+pkg update -y && pkg install -y python git
+pip install -r requirements-minimal.txt
+
+# 2. Telegram credentials দিন (config/api_keys.env):
+#    TELEGRAM_BOT_TOKEN=your_token
+#    TELEGRAM_CHAT_ID=your_chat_id
+
+# 3. একবার test run করুন
+python scripts/free_mode.py --niche dentist --location "New York, NY" --count 10 --skip-scrape
+
+# 4. Daily automation চালু করুন (সকাল ৯টায়)
+python scripts/free_mode.py --loop --time 09:00
+```
+
+**What Free Mode does:**
+- 🔍 Runs US lead research (YellowPages, no API key)
+- 📊 Generates daily summary + manual outreach guide (Bangla + English)
+- 📬 Sends results + CSV to your Telegram automatically
+- ⏰ Runs daily on schedule (phone stays as server)
+
+**Outputs:**
+| File | বিবরণ |
+|------|-------|
+| `tracking/leads.csv` | All leads with scores |
+| `logs/free_mode.log` | Pipeline log |
+
+---
+
 ## সাহায্য প্রয়োজন? (Need Help?)
 
 - 📖 [পূর্ণ ডকুমেন্টেশন](docs/API.md)
