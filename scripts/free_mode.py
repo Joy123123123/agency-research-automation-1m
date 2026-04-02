@@ -206,8 +206,13 @@ def load_leads_summary(leads_csv: str) -> dict:
                 summary["grade_b"] += 1
             else:
                 summary["grade_c"] += 1
-        # Top 5 best leads (grade A or B)
-        top = [r for r in rows if r.get("grade", "").upper() in ("A", "B")][:5]
+        # Top 5 best leads (grade A or B) — use early-stop to avoid scanning full list
+        top = []
+        for r in rows:
+            if r.get("grade", "").upper() in ("A", "B"):
+                top.append(r)
+                if len(top) == 5:
+                    break
         summary["top_leads"] = [
             {
                 "name": r.get("name", "N/A"),
@@ -272,11 +277,12 @@ def build_telegram_message(
         f"  দেখুন সাইট পুরনো/slow কিনা। সমস্যা খুঁজুন।\n"
         f"  <i>(Check if their website is slow, outdated, or missing online booking.)</i>\n\n"
         f"<b>ধাপ ৩ (Step 3) — ফোন বা WhatsApp দিন (Call or WhatsApp):</b>\n"
-        f"  বাংলা স্ক্রিপ্ট:\n"
-        f"  <i>\"হ্যালো, আমি [নাম]। আমরা {niche} ব্যবসায়ীদের অনলাইন লিড বাড়াতে সাহায্য করি। "
+        f"  বাংলা স্ক্রিপ্ট (আপনার নাম দিন [নাম] জায়গায়):\n"
+        f"  <i>\"হ্যালো, আমি [আপনার নাম লিখুন]। আমরা {niche} ব্যবসায়ীদের অনলাইন লিড "
+        f"বাড়াতে সাহায্য করি। "
         f"আপনার ওয়েবসাইট দেখলাম — কিছু সুযোগ আছে। ৫ মিনিট কথা বলতে পারবেন?\"</i>\n\n"
-        f"  English script:\n"
-        f"  <i>\"Hi, I help {niche} businesses get more clients online. "
+        f"  English script (replace [Your Name] with your real name):\n"
+        f"  <i>\"Hi, I'm [Your Name]. I help {niche} businesses get more clients online. "
         f"I checked your website and found some improvement opportunities. "
         f"Can we talk for 5 minutes?\"</i>\n\n"
         f"<b>ধাপ ৪ (Step 4) — অফার বলুন (Give your offer):</b>\n"

@@ -83,9 +83,9 @@ pip install -r requirements.txt
 6. BotFather আপনাকে একটা **token** দেবে:
    ```
    Use this token to access the HTTP API:
-   7123456789:AAFxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   1234567890:ABCDefGhIJKlmNoPQRsTUVwxyZ-abcdefgh
    ```
-   এই token টি সেভ করুন — এটাই `TELEGRAM_BOT_TOKEN`।
+   এই পুরো token string টি সেভ করুন (`:` সহ) — এটাই `TELEGRAM_BOT_TOKEN`।
 
 ### ৫.২ — Chat ID বের করুন
 
@@ -115,10 +115,10 @@ cp config/api_keys.env.example config/api_keys.env
 nano config/api_keys.env
 ```
 
-নিচের lines খুঁজে বের করুন এবং আপনার values দিন:
+নিচের lines খুঁজে বের করুন এবং আপনার values দিন (পুরো token string দিন, quotes ছাড়া):
 
 ```env
-TELEGRAM_BOT_TOKEN=7123456789:AAFxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TELEGRAM_BOT_TOKEN=1234567890:ABCDefGhIJKlmNoPQRsTUVwxyZ-abcdefgh
 TELEGRAM_CHAT_ID=123456789
 ```
 
