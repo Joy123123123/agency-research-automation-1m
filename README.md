@@ -86,6 +86,39 @@ python scripts/run_research.py
 
 ---
 
+## 📋 Google Form — Plumbing (USA) Lead Capture
+
+**Quick reference** — copy/paste question titles and types to recreate the
+Plumbing lead-capture form in Google Drive (works from Android):
+
+```
+Q1  Full Name                    — Short answer
+Q2  Phone Number                 — Short answer
+Q3  Email Address                — Short answer
+Q4  Service Address (ZIP)        — Short answer
+Q5  Preferred Contact Method     — Dropdown
+      Phone Call | Text / SMS | Email | WhatsApp
+Q6  Issue Type                   — Dropdown
+      Leaking Pipe | Clogged Drain | Water Heater Repair / Replacement |
+      Toilet Repair / Replacement | Faucet / Fixture Repair |
+      Sewer Line Issue | Low Water Pressure | Gas Line Issue |
+      New Installation | Other
+Q7  Emergency Level              — Dropdown
+      Emergency — Need Help Now (same day) |
+      Urgent — Within 24 Hours |
+      Scheduled — Within This Week |
+      Planning Ahead — No Rush
+Q8  Best Time to Contact         — Dropdown
+      Morning (8 AM – 12 PM) | Afternoon (12 PM – 5 PM) |
+      Evening (5 PM – 8 PM) | Anytime
+Q9  Short Description            — Paragraph
+```
+
+> Full step-by-step instructions (with Apps Script column-header mapping):
+> [`docs/google-form-plumbing.md`](docs/google-form-plumbing.md)
+
+---
+
 ## 🛠️ সার্ভিস সমূহ (Services Offered)
 
 1. **ওয়েবসাইট ডিজাইন ও ডেভেলপমেন্ট** — $2,000–$10,000
