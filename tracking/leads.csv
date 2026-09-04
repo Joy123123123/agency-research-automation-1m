@@ -1,3 +1,5 @@
 # Lead Tracking — Agency Research Automation
 # CSV Headers: name,niche,location,email,phone,website,has_website,google_rating,review_count,lead_score,grade,priority,status,contacted_at,replied_at,converted_at,created_at
 name,niche,location,email,phone,website,has_website,google_rating,review_count,lead_score,grade,priority,status,contacted_at,replied_at,converted_at,created_at
+Harbor View Diner New York,restaurant,"New York, NY",,,(474) 476-8198,"2099 Cedar Ln, New York, NY 10022",3.2,3,False,True,88.0,new,88.0,A,high
+Blue Plate Eatery New York,restaurant,"New York, NY",,,(535) 661-7355,"3705 Oak Ave, New York, NY 10003",4.9,13,False,True,83.0,new,83.0,A,high
