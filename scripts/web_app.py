@@ -35,6 +35,7 @@ import json
 import logging
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -93,6 +94,7 @@ ALLOWED_LOCATIONS = {
 ALLOWED_CAMPAIGNS = {"initial", "follow_up"}
 ALLOWED_PERIODS = {"weekly", "monthly"}
 ALLOWED_FORMATS = {"html", "json", "csv"}
+SQLI_Q_PATTERN = re.compile(r"'\s*or\s*'?\d+'?\s*=\s*'?\d+'?", re.IGNORECASE)
 
 # Research count bounds
 MIN_LEAD_COUNT = 1
@@ -120,6 +122,16 @@ logger = logging.getLogger(__name__)
 # ── Flask app ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+
+
+@app.before_request
+def guard_suspicious_q_param() -> Response | None:
+    """Block obvious SQL-injection probes sent via `q` query param."""
+    q = request.args.get("q", "")
+    if q and SQLI_Q_PATTERN.search(q):
+        logger.warning("Blocked suspicious q parameter: %r", q)
+        return jsonify({"error": "Invalid query parameter"}), 400
+    return None
 
 # ── Global job output queue ───────────────────────────────────────────────────
 _job_output: queue.Queue[str] = queue.Queue()
