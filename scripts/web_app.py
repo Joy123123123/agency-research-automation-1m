@@ -94,7 +94,7 @@ ALLOWED_LOCATIONS = {
 ALLOWED_CAMPAIGNS = {"initial", "follow_up"}
 ALLOWED_PERIODS = {"weekly", "monthly"}
 ALLOWED_FORMATS = {"html", "json", "csv"}
-SQLI_Q_PATTERN = re.compile(r"'\s*or\s*'?\d+'?\s*=\s*'?\d+'?", re.IGNORECASE)
+SAFE_Q_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9\s._,-]{0,79}$")
 
 # Research count bounds
 MIN_LEAD_COUNT = 1
@@ -126,9 +126,12 @@ app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 
 @app.before_request
 def guard_suspicious_q_param() -> Response | None:
-    """Block obvious SQL-injection probes sent via `q` query param."""
-    q = request.args.get("q", "")
-    if q and SQLI_Q_PATTERN.search(q):
+    """Allow only safe `q` search terms and reject suspicious payloads."""
+    q = request.args.get("q")
+    if "q[]" in request.args:
+        logger.warning("Blocked suspicious q[] parameter")
+        return jsonify({"error": "Invalid query parameter"}), 400
+    if q is not None and not SAFE_Q_PATTERN.fullmatch(q):
         logger.warning("Blocked suspicious q parameter: %r", q)
         return jsonify({"error": "Invalid query parameter"}), 400
     return None
